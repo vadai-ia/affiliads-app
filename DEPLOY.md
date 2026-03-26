@@ -8,15 +8,14 @@ Estado **DB**: las migraciones ya están aplicadas en el proyecto Supabase vincu
 
 ### Auth — URLs obligatorias
 
-En **Authentication → URL configuration**:
+En **Authentication → URL configuration** (debe coincidir con `SITE_URL` en Railway):
 
-| Campo | Valor |
+| Campo | Valor (MVP con dominio Railway) |
 |--------|--------|
-| **Site URL** | La URL pública final de la app, p. ej. `https://app.afiliads.com` (sin slash final) |
-| **Redirect URLs** | Añade exactamente: `https://TU-DOMINIO/auth/callback` |
+| **Site URL** | `https://affiliads-app-production.up.railway.app` (sin slash final) |
+| **Redirect URLs** | `https://affiliads-app-production.up.railway.app/auth/callback` |
 
-Si usas el dominio temporal de Railway primero, añade también  
-`https://TU-SERVICIO.up.railway.app/auth/callback` y luego la URL definitiva.
+Cuando pases a dominio propio (p. ej. Cloudflare → `https://app.afiliads.com`), cambia **Site URL**, añade el nuevo `/auth/callback` en **Redirect URLs** y actualiza `SITE_URL` en Railway.
 
 ### API keys
 
@@ -52,7 +51,7 @@ Configura **todas** estas variables en el servicio (mismo nombre que en `.env.ex
 | `SUPABASE_URL` | URL del proyecto |
 | `SUPABASE_ANON_KEY` | anon |
 | `SUPABASE_SERVICE_ROLE_KEY` | service_role |
-| `SITE_URL` | URL pública **HTTPS** (la misma que Site URL en Supabase Auth) |
+| `SITE_URL` | Por defecto `https://affiliads-app-production.up.railway.app` (misma que Site URL en Supabase Auth) |
 | `NODE_ENV` | `production` |
 | `SENTRY_DSN` | Opcional (servidor + `instrument.server.mjs`) |
 | `VITE_SENTRY_DSN` | Opcional; **debe existir en el build** si quieres Sentry en el cliente (Vite inyecta en compile time) |
@@ -76,7 +75,7 @@ No hace falta comando custom si el repo tiene `package.json` como está.
 ## 3. Verificación post-deploy
 
 ```bash
-curl -sS "https://TU-DOMINIO/api/health"
+curl -sS "https://affiliads-app-production.up.railway.app/api/health"
 ```
 
 Esperado: JSON con `"status":"ok"` y `timestamp`.

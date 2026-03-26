@@ -41,7 +41,7 @@ Guía paso a paso (URLs Auth, variables, healthcheck, CLI): **[DEPLOY.md](./DEPL
 Resumen:
 
 1. En Supabase: **Site URL** + **Redirect URLs** con `/auth/callback`.
-2. En Railway: conectar repo, copiar variables desde `.env.example`, `SITE_URL` = URL pública HTTPS.
+2. En Railway: conectar repo, copiar variables desde `.env.example`; `SITE_URL` = dominio Railway (`https://affiliads-app-production.up.railway.app`) hasta que tengas dominio propio.
 3. `railway.toml` define health check en `GET /api/health`.
 4. Push a `main` despliega si el proyecto está enlazado a GitHub.
 
