@@ -133,13 +133,11 @@ export async function action({ request }: Route.ActionArgs) {
         action: "meta.token_validated",
         metadata: { meta_user_id: v.userId },
       });
-      return data(
-        actionSuccess(
-          { adAccounts, pages },
-          "Token válido. Elige cuenta, página e Instagram.",
-        ),
-        { headers },
-      );
+      const emptyLists = adAccounts.length === 0 && pages.length === 0;
+      const msg = emptyLists
+        ? "Token válido pero Meta no devolvió cuentas ni páginas. Genera un token nuevo con permiso business_management y comprueba en Business Manager que el System User tenga asignadas cuentas publicitarias y páginas."
+        : "Token válido. Elige cuenta, página e Instagram.";
+      return data(actionSuccess({ adAccounts, pages }, msg), { headers });
     } catch (e) {
       if (isMetaApiError(e)) {
         return data(actionError(e.message, undefined, String(e.code)), {

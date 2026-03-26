@@ -37,11 +37,13 @@ export type MetaInstagramAccount = {
   username?: string;
 };
 
+/** System User: `/me/adaccounts` suele ir vacío; hace falta listar por Business (`owned_*`). */
 const REQUIRED_PERMISSIONS = [
   "ads_management",
   "ads_read",
   "pages_show_list",
   "pages_read_engagement",
+  "business_management",
 ] as const;
 
 function graphUrl(path: string, params: Record<string, string>): string {
@@ -130,12 +132,11 @@ export async function validateToken(accessToken: string): Promise<{
   return { userId: me.id, name: me.name, granted: [...granted] };
 }
 
-export async function getAdAccounts(
+async function getAdAccountsFromMe(
   accessToken: string,
 ): Promise<MetaAdAccount[]> {
   const out = await graphGet<{
     data?: { id: string; name: string; account_id: string }[];
-    paging?: { next?: string };
   }>("/me/adaccounts", accessToken, {
     fields: "id,name,account_id",
     limit: "100",
@@ -148,7 +149,52 @@ export async function getAdAccounts(
   }));
 }
 
-export async function getPages(accessToken: string): Promise<MetaPage[]> {
+/**
+ * Cuentas publicitarias del Business (imprescindible para muchos System User tokens).
+ */
+async function getAdAccountsFromBusinesses(
+  accessToken: string,
+): Promise<MetaAdAccount[]> {
+  const businesses = await graphGet<{
+    data?: { id: string; name?: string }[];
+  }>("/me/businesses", accessToken, {
+    fields: "id,name",
+    limit: "50",
+  });
+  const byId = new Map<string, MetaAdAccount>();
+  for (const b of businesses.data ?? []) {
+    try {
+      const owned = await graphGet<{
+        data?: { id: string; name: string; account_id: string }[];
+      }>(`/${b.id}/owned_ad_accounts`, accessToken, {
+        fields: "id,name,account_id",
+        limit: "100",
+      });
+      for (const a of owned.data ?? []) {
+        if (!byId.has(a.id)) {
+          byId.set(a.id, {
+            id: a.id,
+            name: a.name,
+            account_id: a.account_id,
+          });
+        }
+      }
+    } catch {
+      // Sin acceso a este business o sin cuentas; seguir con el resto
+    }
+  }
+  return [...byId.values()];
+}
+
+export async function getAdAccounts(
+  accessToken: string,
+): Promise<MetaAdAccount[]> {
+  const fromMe = await getAdAccountsFromMe(accessToken);
+  if (fromMe.length > 0) return fromMe;
+  return getAdAccountsFromBusinesses(accessToken);
+}
+
+async function getPagesFromMe(accessToken: string): Promise<MetaPage[]> {
   const out = await graphGet<{
     data?: { id: string; name: string }[];
   }>("/me/accounts", accessToken, {
@@ -156,6 +202,59 @@ export async function getPages(accessToken: string): Promise<MetaPage[]> {
     limit: "100",
   });
   return (out.data ?? []).map((p) => ({ id: p.id, name: p.name }));
+}
+
+/**
+ * Páginas poseídas por el Business (System User suele no tener `/me/accounts`).
+ */
+async function getPagesFromBusinesses(
+  accessToken: string,
+): Promise<MetaPage[]> {
+  const businesses = await graphGet<{
+    data?: { id: string; name?: string }[];
+  }>("/me/businesses", accessToken, {
+    fields: "id,name",
+    limit: "50",
+  });
+  const byId = new Map<string, MetaPage>();
+  for (const b of businesses.data ?? []) {
+    try {
+      const owned = await graphGet<{
+        data?: { id: string; name: string }[];
+      }>(`/${b.id}/owned_pages`, accessToken, {
+        fields: "id,name",
+        limit: "100",
+      });
+      for (const p of owned.data ?? []) {
+        if (!byId.has(p.id)) {
+          byId.set(p.id, { id: p.id, name: p.name });
+        }
+      }
+    } catch {
+      try {
+        const client = await graphGet<{
+          data?: { id: string; name: string }[];
+        }>(`/${b.id}/client_pages`, accessToken, {
+          fields: "id,name",
+          limit: "100",
+        });
+        for (const p of client.data ?? []) {
+          if (!byId.has(p.id)) {
+            byId.set(p.id, { id: p.id, name: p.name });
+          }
+        }
+      } catch {
+        // ignorar
+      }
+    }
+  }
+  return [...byId.values()];
+}
+
+export async function getPages(accessToken: string): Promise<MetaPage[]> {
+  const fromMe = await getPagesFromMe(accessToken);
+  if (fromMe.length > 0) return fromMe;
+  return getPagesFromBusinesses(accessToken);
 }
 
 /**
