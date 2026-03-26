@@ -20,6 +20,8 @@ Copia `.env.example` → `.env` y rellena. Nunca commitees `.env`.
 | `VITE_SENTRY_DSN` | Cliente (mismo DSN suele valer) |
 | `ENCRYPTION_KEY` | AES-256-GCM para tokens Meta en DB (`openssl rand -hex 32`) |
 | `META_GRAPH_API_VERSION` | Opcional; default `v21.0` |
+| `META_APP_ID` | Opcional; ID de la app en Meta (solo servidor) |
+| `META_APP_SECRET` | Opcional; **nunca** en el cliente ni en `VITE_*` |
 
 En **Supabase Dashboard → Authentication → URL configuration**:
 

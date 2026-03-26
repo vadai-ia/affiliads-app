@@ -40,6 +40,18 @@ export function getMetaGraphApiVersion(): string {
 }
 
 /**
+ * Credenciales de la Meta App (solo servidor). Opcionales: hoy el flujo usa el
+ * token que el líder pega en UI; sirven para debug_token / flujos futuros.
+ */
+export function getMetaAppId(): string | undefined {
+  return process.env.META_APP_ID?.trim() || undefined;
+}
+
+export function getMetaAppSecret(): string | undefined {
+  return process.env.META_APP_SECRET?.trim() || undefined;
+}
+
+/**
  * Clave AES-256 (32 bytes) en hex (64 caracteres).
  * Solo requerida al cifrar/descifrar tokens Meta (p. ej. guardar conexión).
  */
