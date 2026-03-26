@@ -1,9 +1,19 @@
 import { redirect } from "react-router";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
-import type { Route } from "./+types/home";
+import type { Route } from "./+types/_auth.callback";
 
 export async function loader({ request }: Route.LoaderArgs) {
   const { supabase, headers } = createSupabaseServerClient(request);
+  const url = new URL(request.url);
+  const code = url.searchParams.get("code");
+
+  if (code) {
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    if (error) {
+      throw redirect("/login?error=callback", { headers });
+    }
+  }
+
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -18,7 +28,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     .maybeSingle();
 
   if (!profile) {
-    throw redirect("/login", { headers });
+    throw redirect("/login?error=no_profile", { headers });
   }
 
   if (profile.role === "leader") {
@@ -29,8 +39,4 @@ export async function loader({ request }: Route.LoaderArgs) {
   }
 
   throw redirect("/login", { headers });
-}
-
-export default function Home() {
-  return null;
 }

@@ -1,87 +1,56 @@
-# Welcome to React Router!
+# AfiliAds (app)
 
-A modern, production-ready template for building full-stack React applications using React Router.
+Remix-style app con **React Router v7** + **Supabase** + **Tailwind v4** + **shadcn/ui** (CLI `shadcn` en `devDependencies` solo para `@import "shadcn/tailwind.css"` en `app/app.css`).
 
-[![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/github/remix-run/react-router-templates/tree/main/default)
+## Requisitos
 
-## Features
+- Node 22+
+- Proyecto Supabase con migraciones aplicadas (`supabase/migrations/` + MCP `apply_migration` en producción)
 
-- 🚀 Server-side rendering
-- ⚡️ Hot Module Replacement (HMR)
-- 📦 Asset bundling and optimization
-- 🔄 Data loading and mutations
-- 🔒 TypeScript by default
-- 🎉 TailwindCSS for styling
-- 📖 [React Router docs](https://reactrouter.com/)
+## Variables de entorno
 
-## Getting Started
+Copia `.env.example` → `.env` y rellena. Nunca commitees `.env`.
 
-### Installation
+| Variable | Uso |
+|----------|-----|
+| `SUPABASE_URL` / `SUPABASE_ANON_KEY` | Cliente SSR con cookies |
+| `SUPABASE_SERVICE_ROLE_KEY` | Solo servidor: registro, invitaciones, admin Auth |
+| `SITE_URL` | Base URL para `signInWithOtp` y `generateLink` (`/auth/callback`) |
+| `SENTRY_DSN` | Servidor (`instrument.server.mjs`) |
+| `VITE_SENTRY_DSN` | Cliente (mismo DSN suele valer) |
 
-Install the dependencies:
+En **Supabase Dashboard → Authentication → URL configuration**:
 
-```bash
-npm install
-```
+- **Site URL**: tu `SITE_URL`
+- **Redirect URLs**: `{SITE_URL}/auth/callback`
 
-### Development
-
-Start the development server with HMR:
+## Scripts (verificación estática; sin `npm run dev` en el pipeline interno del workspace)
 
 ```bash
-npm run dev
-```
-
-Your application will be available at `http://localhost:5173`.
-
-## Building for Production
-
-Create a production build:
-
-```bash
+npm run typecheck
+npm run lint
 npm run build
 ```
 
-## Deployment
+`npm run dev` / `npm start` cargan Sentry vía `NODE_OPTIONS='--import ./instrument.server.mjs'`.
 
-### Docker Deployment
+## Deploy (Railway)
 
-To build and run using Docker:
+1. Repo conectado a GitHub; push a `main` despliega.
+2. Variables: las de `.env.example` (producción).
+3. **Start command** (o dejar default si `package.json` ya define `start`): debe incluir `NODE_OPTIONS` como en `package.json`.
+4. Health check HTTP: `GET /api/health`
 
-```bash
-docker build -t my-app .
+## Cloudflare (DNS)
 
-# Run the container
-docker run -p 3000:3000 my-app
-```
+- CNAME del dominio → Railway.
+- Proxy naranja, SSL full.
+- Rate limit recomendado en `/login` (p.ej. 5 req/min/IP).
 
-The containerized application can be deployed to any platform that supports Docker, including:
+## Estructura relevante
 
-- AWS ECS
-- Google Cloud Run
-- Azure Container Apps
-- Digital Ocean App Platform
-- Fly.io
-- Railway
-
-### DIY Deployment
-
-If you're familiar with deploying Node applications, the built-in app server is production-ready.
-
-Make sure to deploy the output of `npm run build`
-
-```
-├── package.json
-├── package-lock.json (or pnpm-lock.yaml, or bun.lockb)
-├── build/
-│   ├── client/    # Static assets
-│   └── server/    # Server-side code
-```
-
-## Styling
-
-This template comes with [Tailwind CSS](https://tailwindcss.com/) already configured for a simple default starting experience. You can use whatever CSS framework you prefer.
-
----
-
-Built with ❤️ using React Router.
+- `app/routes/*` — rutas y layouts `_auth`, `_leader`, `_affiliate`
+- `app/lib/supabase.server.ts` — cliente con cookies
+- `app/lib/supabase.admin.server.ts` — service role (mutaciones sensibles)
+- `app/lib/auth.server.ts` — `requireUser` / `requireLeader` / `requireAffiliate`
+- `supabase/migrations/` — SQL de referencia (aplicado en prod via MCP)

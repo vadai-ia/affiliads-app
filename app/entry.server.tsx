@@ -1,6 +1,7 @@
 import { PassThrough } from "node:stream";
 
-import type { AppLoadContext, EntryContext } from "react-router";
+import * as Sentry from "@sentry/react-router";
+import type { AppLoadContext, EntryContext, HandleErrorFunction } from "react-router";
 import { createReadableStreamFromReadable } from "@react-router/node";
 import { ServerRouter } from "react-router";
 import { isbot } from "isbot";
@@ -9,12 +10,19 @@ import { renderToPipeableStream } from "react-dom/server";
 
 export const streamTimeout = 5_000;
 
+export const handleError: HandleErrorFunction = (error, { request }) => {
+  if (!request.signal.aborted) {
+    Sentry.captureException(error);
+    console.error(error);
+  }
+};
+
 export default function handleRequest(
   request: Request,
   responseStatusCode: number,
   responseHeaders: Headers,
   routerContext: EntryContext,
-  loadContext: AppLoadContext,
+  _loadContext: AppLoadContext,
   // If you have middleware enabled:
   // loadContext: RouterContextProvider
 ) {
@@ -28,11 +36,11 @@ export default function handleRequest(
 
   return new Promise((resolve, reject) => {
     let shellRendered = false;
-    let userAgent = request.headers.get("user-agent");
+    const userAgent = request.headers.get("user-agent");
 
     // Ensure requests from bots and SPA Mode renders wait for all content to load before responding
     // https://react.dev/reference/react-dom/server/renderToPipeableStream#waiting-for-all-content-to-load-for-crawlers-and-static-generation
-    let readyOption: keyof RenderToPipeableStreamOptions =
+    const readyOption: keyof RenderToPipeableStreamOptions =
       (userAgent && isbot(userAgent)) || routerContext.isSpaMode
         ? "onAllReady"
         : "onShellReady";
