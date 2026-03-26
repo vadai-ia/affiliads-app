@@ -48,6 +48,12 @@ export default function LeaderLayout() {
           >
             Afiliados
           </Link>
+          <Link
+            to="/leader/settings/meta"
+            className="rounded-md px-2 py-1.5 hover:bg-muted"
+          >
+            Meta Ads
+          </Link>
         </nav>
       </aside>
       <main className="flex-1 p-4 md:p-8">

@@ -85,6 +85,62 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["invitation_tokens"]["Insert"]>;
         Relationships: [];
       };
+      meta_connections: {
+        Row: {
+          id: string;
+          org_id: string;
+          access_token_encrypted: string;
+          ad_account_id: string;
+          page_id: string;
+          ig_account_id: string | null;
+          business_id: string | null;
+          token_type: string | null;
+          token_expires_at: string | null;
+          encryption_key_version: number | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          access_token_encrypted: string;
+          ad_account_id: string;
+          page_id: string;
+          ig_account_id?: string | null;
+          business_id?: string | null;
+          token_type?: string | null;
+          token_expires_at?: string | null;
+          encryption_key_version?: number | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["meta_connections"]["Insert"]>;
+        Relationships: [];
+      };
+      activity_log: {
+        Row: {
+          id: string;
+          org_id: string;
+          user_id: string | null;
+          entity_type: string;
+          entity_id: string;
+          action: string;
+          metadata: Json | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          user_id?: string | null;
+          entity_type: string;
+          entity_id: string;
+          action: string;
+          metadata?: Json | null;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["activity_log"]["Insert"]>;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {

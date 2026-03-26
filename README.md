@@ -18,6 +18,8 @@ Copia `.env.example` → `.env` y rellena. Nunca commitees `.env`.
 | `SITE_URL` | Base URL para `signInWithOtp` y `generateLink` (`/auth/callback`) |
 | `SENTRY_DSN` | Servidor (`instrument.server.mjs`) |
 | `VITE_SENTRY_DSN` | Cliente (mismo DSN suele valer) |
+| `ENCRYPTION_KEY` | AES-256-GCM para tokens Meta en DB (`openssl rand -hex 32`) |
+| `META_GRAPH_API_VERSION` | Opcional; default `v21.0` |
 
 En **Supabase Dashboard → Authentication → URL configuration**:
 

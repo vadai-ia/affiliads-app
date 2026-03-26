@@ -33,3 +33,36 @@ export function getServerEnv() {
     SENTRY_DSN: process.env.SENTRY_DSN,
   };
 }
+
+/** Graph API version (Marketing API). Default v21.0 */
+export function getMetaGraphApiVersion(): string {
+  return process.env.META_GRAPH_API_VERSION?.trim() || "v21.0";
+}
+
+/**
+ * Clave AES-256 (32 bytes) en hex (64 caracteres).
+ * Solo requerida al cifrar/descifrar tokens Meta (p. ej. guardar conexión).
+ */
+export function getEncryptionKeyHex(): string {
+  const hex = required("ENCRYPTION_KEY");
+  if (!/^[0-9a-fA-F]{64}$/.test(hex)) {
+    throw new Error(
+      "ENCRYPTION_KEY must be 64 hex characters (32 bytes) for AES-256-GCM",
+    );
+  }
+  return hex.toLowerCase();
+}
+
+/** Rotación opcional: versión 2 */
+export function getEncryptionKeyHexForVersion(version: number): string {
+  if (version === 1) return getEncryptionKeyHex();
+  if (version === 2) {
+    const v2 = process.env.ENCRYPTION_KEY_V2;
+    if (!v2) throw new Error("Missing ENCRYPTION_KEY_V2 for encryption key version 2");
+    if (!/^[0-9a-fA-F]{64}$/.test(v2)) {
+      throw new Error("ENCRYPTION_KEY_V2 must be 64 hex characters");
+    }
+    return v2.toLowerCase();
+  }
+  throw new Error(`Unsupported encryption key version: ${version}`);
+}

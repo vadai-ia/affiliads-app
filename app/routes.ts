@@ -11,6 +11,7 @@ export default [
   route("leader", "routes/_leader.tsx", [
     index("routes/_leader._index.tsx"),
     route("affiliates", "routes/_leader.affiliates.tsx"),
+    route("settings/meta", "routes/_leader.settings.meta.tsx"),
   ]),
   route("affiliate", "routes/_affiliate.tsx", [
     index("routes/_affiliate._index.tsx"),

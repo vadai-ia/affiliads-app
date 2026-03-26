@@ -55,6 +55,8 @@ Configura **todas** estas variables en el servicio (mismo nombre que en `.env.ex
 | `NODE_ENV` | `production` |
 | `SENTRY_DSN` | Opcional (servidor + `instrument.server.mjs`) |
 | `VITE_SENTRY_DSN` | Opcional; **debe existir en el build** si quieres Sentry en el cliente (Vite inyecta en compile time) |
+| `ENCRYPTION_KEY` | **Obligatorio** para guardar conexión Meta (hex 64 chars = 32 bytes; `openssl rand -hex 32`) |
+| `META_GRAPH_API_VERSION` | Opcional; default `v21.0` |
 
 Railway inyecta `PORT`; `npm start` ya usa `react-router-serve` y respeta el puerto.
 
