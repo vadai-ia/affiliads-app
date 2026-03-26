@@ -34,12 +34,16 @@ npm run build
 
 `npm run dev` / `npm start` cargan Sentry vía `NODE_OPTIONS='--import ./instrument.server.mjs'`.
 
-## Deploy (Railway)
+## Deploy (Railway + Supabase)
 
-1. Repo conectado a GitHub; push a `main` despliega.
-2. Variables: las de `.env.example` (producción).
-3. **Start command** (o dejar default si `package.json` ya define `start`): debe incluir `NODE_OPTIONS` como en `package.json`.
-4. Health check HTTP: `GET /api/health`
+Guía paso a paso (URLs Auth, variables, healthcheck, CLI): **[DEPLOY.md](./DEPLOY.md)**.
+
+Resumen:
+
+1. En Supabase: **Site URL** + **Redirect URLs** con `/auth/callback`.
+2. En Railway: conectar repo, copiar variables desde `.env.example`, `SITE_URL` = URL pública HTTPS.
+3. `railway.toml` define health check en `GET /api/health`.
+4. Push a `main` despliega si el proyecto está enlazado a GitHub.
 
 ## Cloudflare (DNS)
 
