@@ -69,7 +69,7 @@ No hace falta comando custom si el repo tiene `package.json` como está.
 
 ### Health check
 
-`railway.toml` define `healthcheckPath = "/api/health"`. El loader comprueba conexión a Supabase; si las env vars son incorrectas, responderá 503 (correcto para “no saludable”).
+`railway.toml` define `healthcheckPath = "/api/health"`. El loader hace un `select` mínimo con **service role** (solo servidor): el healthcheck de Railway no envía cookies, así que anon + RLS no serviría. Si faltan credenciales o la DB no responde, 503 (correcto para “no saludable”).
 
 ---
 
