@@ -16,6 +16,10 @@ import { dispatchCampaignCreateJob } from "~/lib/campaign-create.server";
 import { requireLeader } from "~/lib/auth.server";
 import { actionError, formatZodFieldErrors } from "~/lib/errors";
 import { activationStatusBadgeVariant } from "~/lib/activations";
+import {
+  notifyAffiliateProcessing,
+  notifyAffiliateRejected,
+} from "~/lib/notifications.server";
 import { getSupabaseAdmin } from "~/lib/supabase.admin.server";
 import type { Route } from "./+types/_leader.activations.$id";
 
@@ -111,7 +115,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 
     const { data: activation, error: loadErr } = await admin
       .from("campaign_activations")
-      .select("id, org_id, status")
+      .select("id, org_id, status, affiliate_id, template_id")
       .eq("id", id)
       .eq("org_id", user.orgId)
       .maybeSingle();
@@ -185,6 +189,18 @@ export async function action({ request, params }: Route.ActionArgs) {
           inngest_sent: dispatch.sent,
           inngest_error: dispatch.error ?? null,
         },
+      });
+
+      const { data: tplApprove } = await admin
+        .from("campaign_templates")
+        .select("name")
+        .eq("id", activation.template_id)
+        .maybeSingle();
+      await notifyAffiliateProcessing(admin, {
+        affiliateId: activation.affiliate_id,
+        orgId: user.orgId,
+        activationId: id,
+        templateName: tplApprove?.name ?? "Campaña",
       });
 
       if (!dispatch.sent) {
@@ -267,6 +283,19 @@ export async function action({ request, params }: Route.ActionArgs) {
       entity_id: id,
       action: "activation.rejected",
       metadata: {},
+    });
+
+    const { data: tplReject } = await admin
+      .from("campaign_templates")
+      .select("name")
+      .eq("id", activation.template_id)
+      .maybeSingle();
+    await notifyAffiliateRejected(admin, {
+      affiliateId: activation.affiliate_id,
+      orgId: user.orgId,
+      activationId: id,
+      templateName: tplReject?.name ?? "Campaña",
+      reason,
     });
 
     throw redirect("/leader/activations");

@@ -14,6 +14,11 @@ import {
   uploadAdVideoFromUrl,
 } from "~/lib/meta/campaigns.server";
 import { isMetaApiError } from "~/lib/meta/client";
+import {
+  notifyAffiliateCampaignLive,
+  notifyLeadersActivationFailed,
+  formatMetaErrorForEmail,
+} from "~/lib/notifications.server";
 import { getSupabaseAdmin } from "~/lib/supabase.admin.server";
 import { NonRetriableError } from "inngest";
 
@@ -344,6 +349,18 @@ export async function finalizeActivationStep(activationId: string): Promise<void
       meta_ad_id: activation.meta_ad_id,
     },
   });
+
+  const { data: tpl } = await admin
+    .from("campaign_templates")
+    .select("name")
+    .eq("id", activation.template_id)
+    .maybeSingle();
+  await notifyAffiliateCampaignLive(admin, {
+    affiliateId: activation.affiliate_id,
+    orgId: activation.org_id,
+    activationId,
+    templateName: tpl?.name ?? "Campaña",
+  });
 }
 
 export function metaErrorPayload(err: unknown): Json {
@@ -383,7 +400,7 @@ export async function persistActivationFailure(
   const admin = getSupabaseAdmin();
   const { data: row } = await admin
     .from("campaign_activations")
-    .select("org_id, status")
+    .select("org_id, status, template_id")
     .eq("id", activationId)
     .maybeSingle();
   if (!row || row.status !== "activating") return;
@@ -408,5 +425,17 @@ export async function persistActivationFailure(
     entity_id: activationId,
     action: "meta.activation_failed",
     metadata: { meta_error: payload },
+  });
+
+  const { data: tpl } = await admin
+    .from("campaign_templates")
+    .select("name")
+    .eq("id", row.template_id)
+    .maybeSingle();
+  await notifyLeadersActivationFailed(admin, {
+    orgId: row.org_id,
+    activationId,
+    templateName: tpl?.name ?? "Campaña",
+    errorSummary: formatMetaErrorForEmail(payload),
   });
 }

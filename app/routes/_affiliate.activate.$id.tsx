@@ -7,6 +7,7 @@ import {
   buildAffiliateLandingUrl,
   parseActivationSubmitFromFormData,
 } from "~/lib/activations";
+import { notifyLeadersNewActivationRequest } from "~/lib/notifications.server";
 import { getSupabaseAdmin } from "~/lib/supabase.admin.server";
 import { formatBudget } from "~/lib/templates";
 import type { Route } from "./+types/_affiliate.activate.$id";
@@ -119,7 +120,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 
     const { data: template, error: tErr } = await supabase
       .from("campaign_templates")
-      .select("id, org_id, status, min_budget, max_budget")
+      .select("id, org_id, status, min_budget, max_budget, name")
       .eq("id", templateId)
       .eq("org_id", user.orgId)
       .eq("status", "active")
@@ -253,6 +254,13 @@ export async function action({ request, params }: Route.ActionArgs) {
         template_id: templateId,
         budget: payload.budget,
       },
+    });
+
+    await notifyLeadersNewActivationRequest(admin, {
+      orgId: user.orgId,
+      activationId: created.id,
+      templateName: template.name,
+      affiliateName: user.fullName?.trim() || user.email,
     });
 
     throw redirect(`/affiliate/activations/${created.id}`);

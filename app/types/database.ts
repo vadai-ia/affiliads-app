@@ -355,6 +355,34 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["campaign_metrics"]["Insert"]>;
         Relationships: [];
       };
+      notifications: {
+        Row: {
+          id: string;
+          user_id: string;
+          org_id: string;
+          type: string;
+          title: string;
+          body: string | null;
+          read: boolean | null;
+          entity_type: string | null;
+          entity_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          org_id: string;
+          type: string;
+          title: string;
+          body?: string | null;
+          read?: boolean | null;
+          entity_type?: string | null;
+          entity_id?: string | null;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["notifications"]["Insert"]>;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {

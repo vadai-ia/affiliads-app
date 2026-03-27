@@ -6,6 +6,7 @@ import {
   fetchCampaignStatuses,
   parseInsightRow,
 } from "~/lib/meta/insights.server";
+import { notifyAffiliateBudgetCompleted } from "~/lib/notifications.server";
 import { getSupabaseAdmin } from "~/lib/supabase.admin.server";
 import type { Database } from "~/types/database";
 
@@ -165,7 +166,9 @@ export async function runMetricsSyncJob(): Promise<{
 
       const { data: fresh } = await admin
         .from("campaign_activations")
-        .select("id, org_id, status, budget, meta_campaign_id")
+        .select(
+          "id, org_id, status, budget, meta_campaign_id, affiliate_id, template_id",
+        )
         .eq("id", act.id)
         .maybeSingle();
 
@@ -230,6 +233,19 @@ export async function runMetricsSyncJob(): Promise<{
               budget: budgetMajor,
               threshold: BUDGET_COMPLETE_THRESHOLD,
             },
+          });
+          const { data: tpl } = await admin
+            .from("campaign_templates")
+            .select("name")
+            .eq("id", fresh.template_id)
+            .maybeSingle();
+          await notifyAffiliateBudgetCompleted(admin, {
+            affiliateId: fresh.affiliate_id,
+            orgId,
+            activationId: act.id,
+            templateName: tpl?.name ?? "Campaña",
+            budgetLabel: budgetMajor.toFixed(2),
+            spendLabel: parsed.spend.toFixed(2),
           });
         }
       }

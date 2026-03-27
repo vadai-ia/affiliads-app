@@ -1,12 +1,33 @@
-import { Link, Outlet } from "react-router";
-import { Bell } from "lucide-react";
+import { data, Link, Outlet } from "react-router";
 import { Button } from "~/components/ui/button";
+import { NotificationsBell } from "~/components/notifications-bell";
 import { requireLeader } from "~/lib/auth.server";
 import type { Route } from "./+types/_leader";
 
 export async function loader({ request }: Route.LoaderArgs) {
-  await requireLeader(request);
-  return null;
+  const { supabase, user, headers } = await requireLeader(request);
+
+  const [{ data: recent }, { count: unreadCount }] = await Promise.all([
+    supabase
+      .from("notifications")
+      .select("id, title, body, read, entity_type, entity_id, created_at")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(12),
+    supabase
+      .from("notifications")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .eq("read", false),
+  ]);
+
+  return data(
+    {
+      unreadCount: unreadCount ?? 0,
+      notifications: recent ?? [],
+    },
+    { headers },
+  );
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
@@ -23,7 +44,9 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
   );
 }
 
-export default function LeaderLayout() {
+export default function LeaderLayout({ loaderData }: Route.ComponentProps) {
+  const { unreadCount, notifications } = loaderData;
+
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
       <aside className="border-b bg-card p-4 md:w-56 md:border-b-0 md:border-r">
@@ -31,9 +54,11 @@ export default function LeaderLayout() {
           <Link to="/leader" className="font-semibold">
             AfiliAds
           </Link>
-          <Button variant="ghost" size="icon" type="button" aria-label="Notificaciones">
-            <Bell className="size-4" />
-          </Button>
+          <NotificationsBell
+            role="leader"
+            unreadCount={unreadCount}
+            notifications={notifications}
+          />
         </div>
         <nav className="mt-6 flex flex-col gap-1 text-sm">
           <Link

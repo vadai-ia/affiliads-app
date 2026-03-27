@@ -31,5 +31,6 @@ export default [
   ]),
   route("api/health", "routes/api.health.tsx"),
   route("api/upload", "routes/api.upload.tsx"),
+  route("api/notifications", "routes/api.notifications.tsx"),
   route("api/inngest", "routes/api.inngest.tsx"),
 ] satisfies RouteConfig;
