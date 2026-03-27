@@ -171,6 +171,8 @@ export async function createCampaignPaused(
       name: params.name.slice(0, 400),
       objective,
       status: "PAUSED",
+      // Usamos presupuesto en ad set; Meta exige este flag explícito al crear la campaña.
+      is_adset_budget_sharing_enabled: "false",
       special_ad_categories: JSON.stringify([]),
     },
   );

@@ -7,6 +7,8 @@ export type MetaApiError = {
   message: string;
   subcode?: number;
   isRetryable: boolean;
+  userTitle?: string;
+  userMessage?: string;
   raw: unknown;
 };
 
@@ -66,6 +68,8 @@ export function toMetaApiError(raw: unknown): MetaApiError {
       code?: number;
       message?: string;
       error_subcode?: number;
+      error_user_title?: string;
+      error_user_msg?: string;
     };
   };
   const e = r?.error;
@@ -74,11 +78,17 @@ export function toMetaApiError(raw: unknown): MetaApiError {
     typeof e?.message === "string" ? e.message : "Error desconocido de Meta API";
   const subcode =
     typeof e?.error_subcode === "number" ? e.error_subcode : undefined;
+  const userTitle =
+    typeof e?.error_user_title === "string" ? e.error_user_title : undefined;
+  const userMessage =
+    typeof e?.error_user_msg === "string" ? e.error_user_msg : undefined;
   return {
     code,
     message,
     subcode,
     isRetryable: isRetryableCode(code),
+    userTitle,
+    userMessage,
     raw,
   };
 }
