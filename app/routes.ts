@@ -11,10 +11,15 @@ export default [
   route("leader", "routes/_leader.tsx", [
     index("routes/_leader._index.tsx"),
     route("affiliates", "routes/_leader.affiliates.tsx"),
+    route("templates", "routes/_leader.templates._index.tsx"),
+    route("templates/new", "routes/_leader.templates.new.tsx"),
+    route("templates/:id/edit", "routes/_leader.templates.$id.edit.tsx"),
+    route("settings/bank", "routes/_leader.settings.bank.tsx"),
     route("settings/meta", "routes/_leader.settings.meta.tsx"),
   ]),
   route("affiliate", "routes/_affiliate.tsx", [
     index("routes/_affiliate._index.tsx"),
   ]),
   route("api/health", "routes/api.health.tsx"),
+  route("api/upload", "routes/api.upload.tsx"),
 ] satisfies RouteConfig;

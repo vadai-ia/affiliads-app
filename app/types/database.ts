@@ -85,6 +85,32 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["invitation_tokens"]["Insert"]>;
         Relationships: [];
       };
+      bank_details: {
+        Row: {
+          id: string;
+          org_id: string;
+          bank_name: string;
+          account_holder: string;
+          account_number: string;
+          clabe: string | null;
+          instructions: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          bank_name: string;
+          account_holder: string;
+          account_number: string;
+          clabe?: string | null;
+          instructions?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["bank_details"]["Insert"]>;
+        Relationships: [];
+      };
       meta_connections: {
         Row: {
           id: string;
@@ -115,6 +141,140 @@ export interface Database {
           updated_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["meta_connections"]["Insert"]>;
+        Relationships: [];
+      };
+      campaign_templates: {
+        Row: {
+          id: string;
+          org_id: string;
+          name: string;
+          campaign_objective: string;
+          copy_base: string;
+          min_budget: string;
+          max_budget: string;
+          status: "draft" | "active" | "paused" | "archived";
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          name: string;
+          campaign_objective?: string;
+          copy_base: string;
+          min_budget: string;
+          max_budget: string;
+          status?: "draft" | "active" | "paused" | "archived";
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["campaign_templates"]["Insert"]>;
+        Relationships: [];
+      };
+      assets: {
+        Row: {
+          id: string;
+          template_id: string;
+          file_url: string;
+          file_type: "image" | "video";
+          original_name: string | null;
+          sort_order: number | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          template_id: string;
+          file_url: string;
+          file_type: "image" | "video";
+          original_name?: string | null;
+          sort_order?: number | null;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["assets"]["Insert"]>;
+        Relationships: [];
+      };
+      allowed_geos: {
+        Row: {
+          id: string;
+          template_id: string;
+          label: string;
+          country_code: string;
+          region: string | null;
+          city: string | null;
+          radius_km: number | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          template_id: string;
+          label: string;
+          country_code?: string;
+          region?: string | null;
+          city?: string | null;
+          radius_km?: number | null;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["allowed_geos"]["Insert"]>;
+        Relationships: [];
+      };
+      campaign_activations: {
+        Row: {
+          id: string;
+          org_id: string;
+          template_id: string;
+          affiliate_id: string;
+          budget: string;
+          selected_geo_id: string;
+          landing_url: string;
+          meta_campaign_id: string | null;
+          meta_adset_id: string | null;
+          meta_ad_id: string | null;
+          status:
+            | "pending_payment"
+            | "pending_approval"
+            | "rejected"
+            | "activating"
+            | "active"
+            | "paused"
+            | "completed"
+            | "failed";
+          rejection_reason: string | null;
+          meta_error: Json | null;
+          activated_at: string | null;
+          completed_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          template_id: string;
+          affiliate_id: string;
+          budget: string;
+          selected_geo_id: string;
+          landing_url: string;
+          meta_campaign_id?: string | null;
+          meta_adset_id?: string | null;
+          meta_ad_id?: string | null;
+          status?:
+            | "pending_payment"
+            | "pending_approval"
+            | "rejected"
+            | "activating"
+            | "active"
+            | "paused"
+            | "completed"
+            | "failed";
+          rejection_reason?: string | null;
+          meta_error?: Json | null;
+          activated_at?: string | null;
+          completed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<
+          Database["public"]["Tables"]["campaign_activations"]["Insert"]
+        >;
         Relationships: [];
       };
       activity_log: {

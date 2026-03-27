@@ -43,10 +43,22 @@ export default function LeaderLayout() {
             Inicio
           </Link>
           <Link
+            to="/leader/templates"
+            className="rounded-md px-2 py-1.5 hover:bg-muted"
+          >
+            Templates
+          </Link>
+          <Link
             to="/leader/affiliates"
             className="rounded-md px-2 py-1.5 hover:bg-muted"
           >
             Afiliados
+          </Link>
+          <Link
+            to="/leader/settings/bank"
+            className="rounded-md px-2 py-1.5 hover:bg-muted"
+          >
+            Datos bancarios
           </Link>
           <Link
             to="/leader/settings/meta"
