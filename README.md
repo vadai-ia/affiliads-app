@@ -34,8 +34,13 @@ En **Supabase Dashboard → Authentication → URL configuration**:
 ```bash
 npm run typecheck
 npm run lint
+npm run test
 npm run build
 ```
+
+CI en GitHub (`.github/workflows/ci.yml`) ejecuta los mismos pasos en cada push/PR a `main`.
+
+Checklist manual post-deploy: [docs/QA_CHECKLIST_MVP.md](docs/QA_CHECKLIST_MVP.md).
 
 `npm run dev` / `npm start` cargan Sentry vía `NODE_OPTIONS='--import ./instrument.server.mjs'`.
 

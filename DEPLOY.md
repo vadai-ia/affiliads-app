@@ -86,12 +86,29 @@ No hace falta comando custom si el repo tiene `package.json` como está.
 curl -sS "https://affiliads-app-production.up.railway.app/api/health"
 ```
 
-Esperado: JSON con `"status":"ok"` y `timestamp`.
+Esperado: JSON con `"status":"pass"`, `service`, `version`, `uptime`, `timestamp` y `checks.database`.
 
 Luego: registro líder → invitación → enlace `/invite/...` → magic link → callback.
 
 ---
 
-## 4. Cloudflare (opcional)
+## 4. Resend (dominio y entregabilidad)
+
+1. En [Resend → Domains](https://resend.com/domains) añade el dominio (p. ej. `affilia.vadai.com.mx`).
+2. Añade en tu DNS los registros que Resend muestra (SPF, DKIM; a veces un registro de verificación).
+3. Espera **Verified** antes de confiar en producción: sin dominio verificado, Resend puede rechazar o limitar envíos según el remitente.
+4. `EMAIL_FROM` en Railway debe usar una dirección de ese dominio verificado (formato `Nombre <correo@dominio>` o solo el email).
+
+Mientras uses solo la URL de prueba de Railway, el dominio sigue siendo obligatorio para el remitente que configuraste en Resend.
+
+---
+
+## 5. Cloudflare (opcional, cuando tengas dominio propio)
 
 CNAME al dominio Railway, proxy activado, SSL Full, rate limit en `/login` (p. ej. 5 req/min por IP).
+
+---
+
+## CI (GitHub Actions)
+
+En el repo con raíz `afiliads-app`, el workflow `.github/workflows/ci.yml` ejecuta en cada push/PR a `main`: `typecheck`, `lint`, `test`, `build`.

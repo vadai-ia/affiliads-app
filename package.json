@@ -11,7 +11,9 @@
     "dev": "NODE_OPTIONS='--import ./instrument.server.mjs' react-router dev",
     "start": "NODE_OPTIONS='--import ./instrument.server.mjs' react-router-serve ./build/server/index.js",
     "lint": "eslint .",
-    "typecheck": "react-router typegen && tsc"
+    "typecheck": "react-router typegen && tsc",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.2.8",
@@ -21,6 +23,8 @@
     "@radix-ui/react-separator": "^1.1.8",
     "@radix-ui/react-slot": "^1.2.4",
     "@radix-ui/react-tabs": "^1.1.13",
+    "@react-email/components": "^1.0.10",
+    "@react-email/render": "^2.0.4",
     "@react-router/node": "7.13.2",
     "@react-router/serve": "7.13.2",
     "@sentry/react-router": "^10.46.0",
@@ -35,6 +39,7 @@
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-router": "7.13.2",
+    "resend": "^6.9.4",
     "sharp": "^0.34.5",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0",
@@ -56,6 +61,7 @@
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.57.2",
     "vite": "^7.1.7",
-    "vite-tsconfig-paths": "^5.1.4"
+    "vite-tsconfig-paths": "^5.1.4",
+    "vitest": "^3.2.4"
   }
 }
