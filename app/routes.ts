@@ -16,6 +16,8 @@ export default [
     route("templates/:id/edit", "routes/_leader.templates.$id.edit.tsx"),
     route("settings/bank", "routes/_leader.settings.bank.tsx"),
     route("settings/meta", "routes/_leader.settings.meta.tsx"),
+    route("activations", "routes/_leader.activations._index.tsx"),
+    route("activations/:id", "routes/_leader.activations.$id.tsx"),
   ]),
   route("affiliate", "routes/_affiliate.tsx", [
     index("routes/_affiliate._index.tsx"),
@@ -28,4 +30,5 @@ export default [
   ]),
   route("api/health", "routes/api.health.tsx"),
   route("api/upload", "routes/api.upload.tsx"),
+  route("api/inngest", "routes/api.inngest.tsx"),
 ] satisfies RouteConfig;

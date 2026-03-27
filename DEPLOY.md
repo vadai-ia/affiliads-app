@@ -59,6 +59,10 @@ Configura **todas** estas variables en el servicio (mismo nombre que en `.env.ex
 | `META_GRAPH_API_VERSION` | Opcional; default `v21.0` |
 | `META_APP_ID` | Opcional; ID de la app Meta (solo servidor) |
 | `META_APP_SECRET` | Opcional; **solo** Railway/servidor, nunca en build cliente |
+| `INNGEST_EVENT_KEY` | Para enviar eventos (`campaign/create`) al aprobar pagos |
+| `INNGEST_SIGNING_KEY` | Para que Inngest Cloud invoque de forma segura `GET/POST /api/inngest` |
+
+En el dashboard de Inngest, la URL de sync debe ser la misma base que `SITE_URL` (Railway), p. ej. `https://affiliads-app-production.up.railway.app/api/inngest` (cambia el host si tu servicio tiene otro dominio).
 
 Railway inyecta `PORT`; `npm start` ya usa `react-router-serve` y respeta el puerto.
 

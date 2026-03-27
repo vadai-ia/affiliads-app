@@ -1,4 +1,7 @@
 import { Inngest } from "inngest";
 
-/** Cliente Inngest — eventos y funciones en fases posteriores */
-export const inngest = new Inngest({ id: "afiliads", name: "AfiliAds" });
+/** Cliente único de Inngest para eventos y registro de funciones. */
+export const inngest = new Inngest({
+  id: "afiliads",
+  name: "AfiliAds",
+});

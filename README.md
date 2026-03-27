@@ -22,6 +22,7 @@ Copia `.env.example` → `.env` y rellena. Nunca commitees `.env`.
 | `META_GRAPH_API_VERSION` | Opcional; default `v21.0` |
 | `META_APP_ID` | Opcional; ID de la app en Meta (solo servidor) |
 | `META_APP_SECRET` | Opcional; **nunca** en el cliente ni en `VITE_*` |
+| `INNGEST_EVENT_KEY` / `INNGEST_SIGNING_KEY` | Servidor: Inngest; sync URL `https://affiliads-app-production.up.railway.app/api/inngest` (misma base que `SITE_URL` en Railway) |
 
 En **Supabase Dashboard → Authentication → URL configuration**:
 
