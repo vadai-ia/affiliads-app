@@ -80,10 +80,17 @@ export async function uploadAdImageFromUrl(
   imageUrl: string,
 ): Promise<{ hash: string }> {
   const act = normalizeAdAccountId(adAccountId);
+  const assetRes = await fetch(imageUrl);
+  if (!assetRes.ok) {
+    throw new NonRetriableError(
+      `No se pudo descargar el asset para Meta (status=${assetRes.status}).`,
+    );
+  }
+  const bytes = Buffer.from(await assetRes.arrayBuffer()).toString("base64");
   const json = await graphPostForm<{
     images?: Record<string, { hash?: string }>;
   }>(`/${act}/adimages`, accessToken, {
-    urls: JSON.stringify([imageUrl]),
+    bytes,
   });
   const first = json.images ? Object.values(json.images)[0] : undefined;
   const hash = first?.hash;
@@ -201,6 +208,15 @@ export type TargetingSpec = {
   geo_locations: { countries: string[] };
 };
 
+function buildAdSetSchedule() {
+  const start = new Date(Date.now() + 5 * 60 * 1000);
+  const end = new Date(start.getTime() + 30 * 24 * 60 * 60 * 1000);
+  return {
+    start_time: start.toISOString(),
+    end_time: end.toISOString(),
+  };
+}
+
 export async function createAdSetPaused(
   accessToken: string,
   adAccountId: string,
@@ -214,6 +230,7 @@ export async function createAdSetPaused(
 ): Promise<{ adsetId: string }> {
   const act = normalizeAdAccountId(adAccountId);
   const optimization_goal = adSetOptimizationForObjective(params.objective);
+  const schedule = buildAdSetSchedule();
   const json = await graphPostForm<{ id?: string }>(`/${act}/adsets`, accessToken, {
     name: params.name.slice(0, 400),
     campaign_id: params.campaignId,
@@ -221,6 +238,8 @@ export async function createAdSetPaused(
     optimization_goal,
     bid_strategy: "LOWEST_COST_WITHOUT_CAP",
     lifetime_budget: params.lifetimeBudgetMinorUnits,
+    start_time: schedule.start_time,
+    end_time: schedule.end_time,
     targeting: JSON.stringify(params.targeting),
     status: "PAUSED",
   });

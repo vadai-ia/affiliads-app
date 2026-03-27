@@ -365,6 +365,18 @@ export async function finalizeActivationStep(activationId: string): Promise<void
 
 export function metaErrorPayload(err: unknown): Json {
   if (err instanceof NonRetriableError) {
+    const cause = err.cause;
+    if (isMetaApiError(cause)) {
+      return {
+        type: "meta_api",
+        code: cause.code,
+        subcode: cause.subcode,
+        message: cause.message,
+        user_title: cause.userTitle ?? null,
+        user_message: cause.userMessage ?? null,
+        retryable: cause.isRetryable,
+      };
+    }
     return {
       type: "non_retriable",
       message: err.message,
@@ -376,6 +388,8 @@ export function metaErrorPayload(err: unknown): Json {
       code: err.code,
       subcode: err.subcode,
       message: err.message,
+      user_title: err.userTitle ?? null,
+      user_message: err.userMessage ?? null,
       retryable: err.isRetryable,
     };
   }

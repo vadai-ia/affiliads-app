@@ -317,6 +317,9 @@ export function formatMetaErrorForEmail(metaError: Json): string {
     return "Error desconocido al crear la campaña en Meta.";
   }
   const o = metaError as Record<string, unknown>;
+  if (typeof o.user_message === "string" && o.user_message.length > 0) {
+    return o.user_message.slice(0, 900);
+  }
   if (typeof o.message === "string") return o.message.slice(0, 900);
   if (o.type === "meta_api") {
     const code = o.code != null ? String(o.code) : "";
