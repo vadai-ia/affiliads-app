@@ -329,6 +329,32 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["activity_log"]["Insert"]>;
         Relationships: [];
       };
+      campaign_metrics: {
+        Row: {
+          id: string;
+          activation_id: string;
+          spend: string | null;
+          impressions: number | null;
+          clicks: number | null;
+          leads: number | null;
+          cpl: string | null;
+          date: string;
+          synced_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          activation_id: string;
+          spend?: string | null;
+          impressions?: number | null;
+          clicks?: number | null;
+          leads?: number | null;
+          cpl?: string | null;
+          date?: string;
+          synced_at?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["campaign_metrics"]["Insert"]>;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {

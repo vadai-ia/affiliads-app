@@ -10,6 +10,7 @@ export default [
   ]),
   route("leader", "routes/_leader.tsx", [
     index("routes/_leader._index.tsx"),
+    route("metrics", "routes/_leader.metrics.tsx"),
     route("affiliates", "routes/_leader.affiliates.tsx"),
     route("templates", "routes/_leader.templates._index.tsx"),
     route("templates/new", "routes/_leader.templates.new.tsx"),

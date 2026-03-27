@@ -1,4 +1,4 @@
-import { NonRetriableError } from "inngest";
+import { cron, NonRetriableError } from "inngest";
 import {
   ensureMetaAdsetStep,
   ensureMetaAdStep,
@@ -9,6 +9,10 @@ import {
   shouldPersistActivationFailure,
 } from "~/lib/campaign-create.job.server";
 import { inngest } from "~/lib/inngest/client";
+import {
+  runMetricsSyncJob,
+  warnStuckActivating,
+} from "~/lib/metrics-sync.job.server";
 
 type CampaignCreateEvent = {
   data: {
@@ -72,4 +76,18 @@ export const campaignCreate = inngest.createFunction(
   },
 );
 
-export const inngestFunctions = [campaignCreate] as const;
+export const metricsSync = inngest.createFunction(
+  {
+    id: "metrics-sync",
+    name: "Sincronizar métricas Meta",
+    triggers: [cron("*/15 * * * *")],
+    retries: 2,
+  },
+  async ({ step }) => {
+    const result = await step.run("sync-metrics", () => runMetricsSyncJob());
+    await step.run("warn-stuck-activating", () => warnStuckActivating());
+    return result;
+  },
+);
+
+export const inngestFunctions = [campaignCreate, metricsSync] as const;

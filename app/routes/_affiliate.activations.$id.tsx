@@ -33,7 +33,12 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     throw new Response("No encontrado", { status: 404, headers });
   }
 
-  const [{ data: template }, { data: geo }, { data: payment }] = await Promise.all([
+  const [
+    { data: template },
+    { data: geo },
+    { data: payment },
+    { data: metricsRows },
+  ] = await Promise.all([
     supabase
       .from("campaign_templates")
       .select("name, copy_base, min_budget, max_budget")
@@ -49,6 +54,14 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       .select("proof_url, amount, status, created_at, rejection_reason")
       .eq("activation_id", activation.id)
       .maybeSingle(),
+    supabase
+      .from("campaign_metrics")
+      .select(
+        "date, spend, impressions, clicks, leads, cpl, synced_at",
+      )
+      .eq("activation_id", activation.id)
+      .order("date", { ascending: false })
+      .limit(90),
   ]);
 
   return data(
@@ -59,6 +72,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       geoLabel: geo?.label ?? "—",
       geoCountry: geo?.country_code ?? "",
       payment,
+      metricsHistory: metricsRows ?? [],
     },
     { headers },
   );
@@ -74,7 +88,25 @@ export default function AffiliateActivationDetail({
     geoLabel,
     geoCountry,
     payment,
+    metricsHistory,
   } = loaderData;
+
+  const latestMetric = metricsHistory[0];
+  const budgetNum = Number.parseFloat(activation.budget);
+  const spendNum = latestMetric?.spend
+    ? Number.parseFloat(latestMetric.spend)
+    : 0;
+  const spendPct =
+    Number.isFinite(budgetNum) && budgetNum > 0
+      ? Math.min(100, (spendNum / budgetNum) * 100)
+      : 0;
+
+  const fmtMoney = (n: number) =>
+    new Intl.NumberFormat("es-MX", {
+      style: "currency",
+      currency: "MXN",
+      maximumFractionDigits: 2,
+    }).format(Number.isFinite(n) ? n : 0);
 
   const timeline = [
     { label: "Creada", at: activation.created_at },
@@ -82,6 +114,9 @@ export default function AffiliateActivationDetail({
   ];
   if (activation.activated_at) {
     timeline.push({ label: "Activada en Meta (aprox.)", at: activation.activated_at });
+  }
+  if (activation.status === "paused") {
+    timeline.push({ label: "Pausada (plataforma)", at: activation.updated_at });
   }
   if (activation.completed_at) {
     timeline.push({ label: "Completada", at: activation.completed_at });
@@ -186,12 +221,144 @@ export default function AffiliateActivationDetail({
         </CardContent>
       </Card>
 
+      <div>
+        <h2 className="text-lg font-semibold tracking-tight">Métricas (Meta)</h2>
+        <p className="text-muted-foreground mt-1 text-sm">
+          Datos del día en curso (snapshot diario). Última sync:{" "}
+          {latestMetric?.synced_at
+            ? new Date(latestMetric.synced_at).toLocaleString("es-MX")
+            : "—"}
+        </p>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Gasto</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-semibold tabular-nums">
+                {latestMetric?.spend != null ? fmtMoney(spendNum) : "—"}
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Impresiones</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-semibold tabular-nums">
+                {latestMetric?.impressions ?? "—"}
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Clics</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-semibold tabular-nums">
+                {latestMetric?.clicks ?? "—"}
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Leads</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-semibold tabular-nums">
+                {latestMetric?.leads ?? "—"}
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">CPL</CardTitle>
+              <CardDescription>Costo por lead (si aplica)</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-semibold tabular-nums">
+                {latestMetric?.cpl != null && latestMetric.cpl !== ""
+                  ? fmtMoney(Number.parseFloat(latestMetric.cpl))
+                  : "—"}
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card className="mt-4">
+          <CardHeader>
+            <CardTitle className="text-base">Presupuesto vs gasto</CardTitle>
+            <CardDescription>
+              Presupuesto contratado: {fmtMoney(budgetNum)} ·{" "}
+              {Number.isFinite(spendPct) ? `${spendPct.toFixed(1)}%` : "—"} del
+              presupuesto
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="bg-muted h-3 w-full overflow-hidden rounded-full">
+              <div
+                className="bg-primary h-full rounded-full transition-[width]"
+                style={{ width: `${spendPct}%` }}
+              />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Histórico diario</CardTitle>
+          <CardDescription>Últimos días con datos sincronizados.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {metricsHistory.length === 0 ? (
+            <p className="text-muted-foreground text-sm">
+              Aún no hay métricas. Aparecerán cuando la campaña esté activa y el
+              job de sincronización corra.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left text-muted-foreground">
+                    <th className="pb-2 pr-4 font-medium">Fecha</th>
+                    <th className="pb-2 pr-4 font-medium">Gasto</th>
+                    <th className="pb-2 pr-4 font-medium">Imp.</th>
+                    <th className="pb-2 pr-4 font-medium">Clics</th>
+                    <th className="pb-2 pr-4 font-medium">Leads</th>
+                    <th className="pb-2 font-medium">CPL</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {metricsHistory.map((row) => (
+                    <tr key={row.date} className="border-b border-border/60">
+                      <td className="py-2 pr-4">{row.date}</td>
+                      <td className="py-2 pr-4 tabular-nums">
+                        {row.spend != null ? fmtMoney(Number.parseFloat(row.spend)) : "—"}
+                      </td>
+                      <td className="py-2 pr-4 tabular-nums">
+                        {row.impressions ?? "—"}
+                      </td>
+                      <td className="py-2 pr-4 tabular-nums">{row.clicks ?? "—"}</td>
+                      <td className="py-2 pr-4 tabular-nums">{row.leads ?? "—"}</td>
+                      <td className="py-2 tabular-nums">
+                        {row.cpl != null && row.cpl !== ""
+                          ? fmtMoney(Number.parseFloat(row.cpl))
+                          : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>Historial</CardTitle>
-          <CardDescription>
-            Las métricas de Meta se mostrarán aquí en una fase posterior.
-          </CardDescription>
+          <CardDescription>Estados y fechas de la solicitud.</CardDescription>
         </CardHeader>
         <CardContent>
           <ul className="space-y-2 text-sm">

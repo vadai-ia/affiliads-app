@@ -49,6 +49,12 @@ export default function LeaderLayout() {
             Solicitudes
           </Link>
           <Link
+            to="/leader/metrics"
+            className="rounded-md px-2 py-1.5 hover:bg-muted"
+          >
+            Métricas
+          </Link>
+          <Link
             to="/leader/templates"
             className="rounded-md px-2 py-1.5 hover:bg-muted"
           >
