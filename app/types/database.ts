@@ -277,6 +277,34 @@ export interface Database {
         >;
         Relationships: [];
       };
+      payments: {
+        Row: {
+          id: string;
+          activation_id: string;
+          proof_url: string;
+          amount: string;
+          status: "pending" | "approved" | "rejected";
+          rejection_reason: string | null;
+          reviewed_at: string | null;
+          reviewed_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          activation_id: string;
+          proof_url: string;
+          amount: string;
+          status?: "pending" | "approved" | "rejected";
+          rejection_reason?: string | null;
+          reviewed_at?: string | null;
+          reviewed_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["payments"]["Insert"]>;
+        Relationships: [];
+      };
       activity_log: {
         Row: {
           id: string;

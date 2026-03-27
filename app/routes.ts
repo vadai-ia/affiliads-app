@@ -19,6 +19,12 @@ export default [
   ]),
   route("affiliate", "routes/_affiliate.tsx", [
     index("routes/_affiliate._index.tsx"),
+    route("dashboard", "routes/_affiliate.dashboard.tsx"),
+    route("campaigns", "routes/_affiliate.campaigns._index.tsx"),
+    route("campaigns/:id", "routes/_affiliate.campaigns.$id.tsx"),
+    route("activate/:id", "routes/_affiliate.activate.$id.tsx"),
+    route("activations", "routes/_affiliate.activations._index.tsx"),
+    route("activations/:id", "routes/_affiliate.activations.$id.tsx"),
   ]),
   route("api/health", "routes/api.health.tsx"),
   route("api/upload", "routes/api.upload.tsx"),

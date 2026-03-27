@@ -6,10 +6,16 @@ import { requireUser } from "~/lib/auth.server";
 import { actionError, actionSuccess } from "~/lib/errors";
 import type { Route } from "./+types/api.upload";
 
+const purposeSchema = z.enum(["campaign_asset", "payment_proof"]);
+
 const IMAGE_TYPES = new Set(["image/jpeg", "image/png"]);
 const VIDEO_TYPES = new Set(["video/mp4"]);
+const PAYMENT_IMAGE_TYPES = new Set(["image/jpeg", "image/png"]);
+const PAYMENT_PDF = "application/pdf";
+
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
 const MAX_VIDEO_SIZE = 500 * 1024 * 1024;
+const MAX_PAYMENT_FILE_SIZE = 10 * 1024 * 1024;
 
 function sanitizeFileName(name: string) {
   return name.toLowerCase().replace(/[^a-z0-9._-]+/g, "-");
@@ -20,11 +26,82 @@ export async function action({ request }: Route.ActionArgs) {
   const formData = await request.formData();
   const fileValue = formData.get("file");
 
+  const purposeRaw = formData.get("purpose");
+  const purposeStr =
+    typeof purposeRaw === "string" && purposeRaw.length > 0
+      ? purposeRaw
+      : "campaign_asset";
+  const purpose = purposeSchema.safeParse(purposeStr);
+  if (!purpose.success) {
+    return data(actionError("Propósito de subida inválido."), { headers });
+  }
+
   if (!(fileValue instanceof File)) {
     return data(actionError("Selecciona un archivo válido."), { headers });
   }
 
   const file = fileValue;
+
+  if (purpose.data === "payment_proof") {
+    if (user.role !== "affiliate") {
+      return data(
+        actionError("Solo afiliados pueden subir comprobantes."),
+        { headers, status: 403 },
+      );
+    }
+
+    if (file.size > MAX_PAYMENT_FILE_SIZE) {
+      return data(actionError("El comprobante excede 10MB."), { headers });
+    }
+
+    let fileType: "image" | "pdf";
+    if (PAYMENT_IMAGE_TYPES.has(file.type)) {
+      fileType = "image";
+      const imageBuffer = Buffer.from(await file.arrayBuffer());
+      const metadata = await sharp(imageBuffer).metadata();
+      if (!metadata.width || !metadata.height) {
+        return data(actionError("No se pudo leer la imagen."), { headers });
+      }
+    } else if (file.type === PAYMENT_PDF) {
+      fileType = "pdf";
+    } else {
+      return data(
+        actionError("Formato no permitido. Usa JPG, PNG o PDF."),
+        { headers },
+      );
+    }
+
+    const safeName = sanitizeFileName(file.name || "comprobante");
+    const storagePath = `${user.orgId}/${user.id}/${randomUUID()}-${safeName}`;
+    const bucket = "payment-proofs";
+
+    const uploadResult = await supabase.storage.from(bucket).upload(storagePath, file, {
+      contentType: file.type,
+      upsert: false,
+    });
+
+    if (uploadResult.error) {
+      return data(actionError(uploadResult.error.message), { headers });
+    }
+
+    const publicUrlResult = supabase.storage.from(bucket).getPublicUrl(storagePath);
+    const payload = {
+      fileUrl: publicUrlResult.data.publicUrl,
+      storagePath,
+      fileType,
+      originalName: file.name || null,
+    };
+
+    return data(
+      actionSuccess(
+        payload,
+        "Comprobante subido correctamente.",
+      ),
+      { headers },
+    );
+  }
+
+  // campaign_asset (creativos)
   if (IMAGE_TYPES.has(file.type)) {
     if (file.size > MAX_IMAGE_SIZE) {
       return data(actionError("La imagen excede 10MB."), { headers });

@@ -37,10 +37,22 @@ export default function AffiliateLayout() {
         </div>
         <nav className="mt-6 flex flex-col gap-1 text-sm">
           <Link
-            to="/affiliate"
+            to="/affiliate/dashboard"
             className="rounded-md px-2 py-1.5 hover:bg-muted"
           >
             Inicio
+          </Link>
+          <Link
+            to="/affiliate/campaigns"
+            className="rounded-md px-2 py-1.5 hover:bg-muted"
+          >
+            Campañas
+          </Link>
+          <Link
+            to="/affiliate/activations"
+            className="rounded-md px-2 py-1.5 hover:bg-muted"
+          >
+            Mis activaciones
           </Link>
         </nav>
       </aside>
