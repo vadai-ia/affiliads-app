@@ -1,23 +1,20 @@
 import { Inngest } from "inngest";
 
-function inferInngestEnv() {
-  const explicitEnv = process.env.INNGEST_ENV?.trim();
-  if (explicitEnv) {
-    return explicitEnv;
-  }
-
-  const signingKey = process.env.INNGEST_SIGNING_KEY?.trim();
-  if (!signingKey || signingKey.startsWith("signkey-branch-")) {
-    return undefined;
-  }
-
-  const match = signingKey.match(/^signkey-([\w]+)-/);
-  return match?.[1];
+/**
+ * Solo `INNGEST_ENV` explícito (sin inferir desde la signing key).
+ * Inferir `prod` desde `signkey-prod-*` hacía que los eventos fueran a un
+ * branch "prod" distinto del entorno Production por defecto → en el dashboard
+ * el evento aparecía recibido pero "No functions triggered".
+ * @see https://www.inngest.com/docs/sdk/environment-variables#inngest-env
+ */
+function resolveInngestEnv(): string | undefined {
+  const v = process.env.INNGEST_ENV?.trim();
+  return v || undefined;
 }
 
 /** Cliente único de Inngest para eventos y registro de funciones. */
 export const inngest = new Inngest({
   id: "afiliads",
   name: "AfiliAds",
-  env: inferInngestEnv(),
+  env: resolveInngestEnv(),
 });
