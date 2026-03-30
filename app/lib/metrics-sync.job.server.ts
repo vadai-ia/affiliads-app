@@ -284,3 +284,29 @@ export async function warnStuckActivating(): Promise<void> {
     );
   }
 }
+
+/** Cola aprobada pero sin avance hacia Meta (reconciliador debería re-despachar). */
+export async function warnStuckQueued(): Promise<void> {
+  if (!process.env.SENTRY_DSN) return;
+
+  const admin = getSupabaseAdmin();
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+
+  const { data: stuck, error } = await admin
+    .from("campaign_activations")
+    .select("id, org_id, updated_at")
+    .eq("status", "queued")
+    .lt("updated_at", oneHourAgo);
+
+  if (error || !stuck?.length) return;
+
+  for (const row of stuck) {
+    Sentry.captureMessage(
+      `Activación en estado queued > 1h (job no procesado): ${row.id}`,
+      {
+        level: "warning",
+        extra: { org_id: row.org_id, updated_at: row.updated_at },
+      },
+    );
+  }
+}

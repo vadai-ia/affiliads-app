@@ -20,6 +20,11 @@ import {
   formatMetaErrorForEmail,
 } from "~/lib/notifications.server";
 import { getSupabaseAdmin } from "~/lib/supabase.admin.server";
+import {
+  markJobFailed,
+  markJobSucceeded,
+  updateJobStep,
+} from "~/lib/campaign-create-queue.server";
 import { NonRetriableError } from "inngest";
 
 type ActivationRow = Database["public"]["Tables"]["campaign_activations"]["Row"];
@@ -145,6 +150,105 @@ export async function loadCampaignCreateContext(
     meta,
     accessToken,
   };
+}
+
+/**
+ * Pasa `queued` → `activating` y marca el job como `running` (idempotente para reintentos Inngest).
+ */
+export async function claimQueuedActivationForMeta(
+  activationId: string,
+  runId: string,
+): Promise<void> {
+  const admin = getSupabaseAdmin();
+  const { data: act } = await admin
+    .from("campaign_activations")
+    .select("id, org_id, status")
+    .eq("id", activationId)
+    .maybeSingle();
+
+  if (!act) throw new NonRetriableError("Activación no encontrada.");
+  if (act.status === "active") return;
+  if (act.status === "failed" || act.status === "rejected") {
+    throw new NonRetriableError(`Estado inválido para Meta: ${act.status}`);
+  }
+
+  if (act.status === "queued") {
+    const { data: upd, error } = await admin
+      .from("campaign_activations")
+      .update({ status: "activating" })
+      .eq("id", activationId)
+      .eq("status", "queued")
+      .select("id")
+      .maybeSingle();
+    if (error) throw new NonRetriableError(error.message);
+    if (!upd) {
+      const { data: refresh } = await admin
+        .from("campaign_activations")
+        .select("status")
+        .eq("id", activationId)
+        .maybeSingle();
+      if (refresh?.status !== "activating") {
+        throw new NonRetriableError(
+          "No se pudo reclamar la activación (queued→activating).",
+        );
+      }
+    }
+  }
+
+  const { data: job } = await admin
+    .from("campaign_create_jobs")
+    .select("*")
+    .eq("activation_id", activationId)
+    .maybeSingle();
+
+  if (!job) {
+    const { error: insErr } = await admin.from("campaign_create_jobs").insert({
+      org_id: act.org_id,
+      activation_id: activationId,
+      status: "running",
+      attempt_count: 1,
+      locked_at: new Date().toISOString(),
+      locked_by: runId,
+      current_step: "claim",
+    });
+    if (insErr) throw new NonRetriableError(insErr.message);
+    console.info("[claim] created missing job row", { activationId, runId });
+    return;
+  }
+
+  if (job.status === "succeeded") return;
+
+  const bumpAttempt =
+    job.status === "pending" || job.status === "dispatched";
+  const nextAttempt = bumpAttempt ? job.attempt_count + 1 : job.attempt_count;
+
+  const { error: jErr } = await admin
+    .from("campaign_create_jobs")
+    .update({
+      status: "running",
+      locked_at: new Date().toISOString(),
+      locked_by: runId,
+      current_step: "claim",
+      attempt_count: nextAttempt,
+    })
+    .eq("id", job.id)
+    .in("status", ["pending", "dispatched", "running"]);
+  if (jErr) throw new NonRetriableError(jErr.message);
+
+  console.info("[claim] job running", {
+    activationId,
+    runId,
+    prevJobStatus: job.status,
+  });
+}
+
+export async function traceMetaStep(
+  activationId: string,
+  stepName: string,
+  runId: string,
+): Promise<void> {
+  const admin = getSupabaseAdmin();
+  await updateJobStep(admin, activationId, stepName, runId);
 }
 
 function pickPrimaryAsset(assets: AssetRow[]): AssetRow {
@@ -337,6 +441,8 @@ export async function finalizeActivationStep(activationId: string): Promise<void
     throw new NonRetriableError(uErr.message);
   }
 
+  await markJobSucceeded(admin, activationId);
+
   await admin.from("activity_log").insert({
     org_id: activation.org_id,
     user_id: null,
@@ -417,7 +523,9 @@ export async function persistActivationFailure(
     .select("org_id, status, template_id")
     .eq("id", activationId)
     .maybeSingle();
-  if (!row || row.status !== "activating") return;
+  if (!row || (row.status !== "activating" && row.status !== "queued")) {
+    return;
+  }
 
   const payload = metaErrorPayload(err);
   const now = new Date().toISOString();
@@ -430,7 +538,9 @@ export async function persistActivationFailure(
     })
     .eq("id", activationId)
     .eq("org_id", row.org_id)
-    .eq("status", "activating");
+    .in("status", ["queued", "activating"]);
+
+  await markJobFailed(admin, activationId, payload);
 
   await admin.from("activity_log").insert({
     org_id: row.org_id,

@@ -1,5 +1,6 @@
 import { cron, NonRetriableError } from "inngest";
 import {
+  claimQueuedActivationForMeta,
   ensureMetaAdsetStep,
   ensureMetaAdStep,
   ensureMetaCampaignStep,
@@ -7,11 +8,14 @@ import {
   loadCampaignCreateContext,
   persistActivationFailure,
   shouldPersistActivationFailure,
+  traceMetaStep,
 } from "~/lib/campaign-create.job.server";
+import { reconcileCampaignCreateJobs } from "~/lib/campaign-create-queue.server";
 import { inngest } from "~/lib/inngest/client";
 import {
   runMetricsSyncJob,
   warnStuckActivating,
+  warnStuckQueued,
 } from "~/lib/metrics-sync.job.server";
 
 type CampaignCreateEvent = {
@@ -38,13 +42,17 @@ export const campaignCreate = inngest.createFunction(
   },
   async ({ event, step }) => {
     const activationId = event.data.activationId as string;
+    const runId = `${(event as { id?: string }).id ?? "evt"}-${activationId.slice(0, 8)}`;
 
     const gate = await step.run("gate", async () => {
       const ctx = await loadCampaignCreateContext(activationId);
       if (ctx.activation.status === "active") {
         return { skip: true as const };
       }
-      if (ctx.activation.status !== "activating") {
+      const ok =
+        ctx.activation.status === "queued" ||
+        ctx.activation.status === "activating";
+      if (!ok) {
         throw new NonRetriableError(
           `Estado de activación inválido para el job: ${ctx.activation.status}`,
         );
@@ -57,12 +65,25 @@ export const campaignCreate = inngest.createFunction(
     }
 
     try {
-      await step.run("meta-campaign", () =>
-        ensureMetaCampaignStep(activationId),
+      await step.run("claim", () =>
+        claimQueuedActivationForMeta(activationId, runId),
       );
-      await step.run("meta-adset", () => ensureMetaAdsetStep(activationId));
-      await step.run("meta-ad", () => ensureMetaAdStep(activationId));
-      await step.run("meta-activate", () => finalizeActivationStep(activationId));
+      await step.run("meta-campaign", async () => {
+        await traceMetaStep(activationId, "meta-campaign", runId);
+        return ensureMetaCampaignStep(activationId);
+      });
+      await step.run("meta-adset", async () => {
+        await traceMetaStep(activationId, "meta-adset", runId);
+        return ensureMetaAdsetStep(activationId);
+      });
+      await step.run("meta-ad", async () => {
+        await traceMetaStep(activationId, "meta-ad", runId);
+        return ensureMetaAdStep(activationId);
+      });
+      await step.run("meta-activate", async () => {
+        await traceMetaStep(activationId, "meta-activate", runId);
+        return finalizeActivationStep(activationId);
+      });
     } catch (e) {
       if (shouldPersistActivationFailure(e)) {
         await step.run("persist-failure", async () => {
@@ -76,6 +97,22 @@ export const campaignCreate = inngest.createFunction(
   },
 );
 
+export const campaignCreateReconcile = inngest.createFunction(
+  {
+    id: "campaign-create-reconcile",
+    name: "Reconciliar cola creación Meta",
+    triggers: [cron("*/5 * * * *")],
+    retries: 2,
+  },
+  async ({ step }) => {
+    const result = await step.run("reconcile", () =>
+      reconcileCampaignCreateJobs(),
+    );
+    console.info("[inngest] campaign-create-reconcile", result);
+    return result;
+  },
+);
+
 export const metricsSync = inngest.createFunction(
   {
     id: "metrics-sync",
@@ -86,8 +123,13 @@ export const metricsSync = inngest.createFunction(
   async ({ step }) => {
     const result = await step.run("sync-metrics", () => runMetricsSyncJob());
     await step.run("warn-stuck-activating", () => warnStuckActivating());
+    await step.run("warn-stuck-queued", () => warnStuckQueued());
     return result;
   },
 );
 
-export const inngestFunctions = [campaignCreate, metricsSync] as const;
+export const inngestFunctions = [
+  campaignCreate,
+  campaignCreateReconcile,
+  metricsSync,
+] as const;

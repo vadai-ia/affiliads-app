@@ -64,6 +64,10 @@ Configura **todas** estas variables en el servicio (mismo nombre que en `.env.ex
 
 En el dashboard de Inngest, la URL de sync debe ser la misma base que `SITE_URL` (Railway), p. ej. `https://affiliads-app-production.up.railway.app/api/inngest` (cambia el host si tu servicio tiene otro dominio).
 
+Tras un deploy que registre funciones nuevas, confirma en **Inngest** que la app sincronizó (o fuerza sync). Funciones relevantes: `campaign-create` (evento `campaign/create`), `campaign-create-reconcile` (cron cada 5 min, cola durable), `metrics-sync` (cron 15 min).
+
+**Verificación post-deploy (activación Meta):** aprueba una solicitud en cola → la fila pasa a `queued` y existe fila en `campaign_create_jobs` en Supabase → `status` del job pasa a `dispatched`/`running` y la activación a `activating` cuando el worker corre → `active` o `failed` con `meta_error`. Si queda colgada, el botón **Reintentar publicación** en el detalle del líder o el cron reconciliador vuelve a enviar el evento.
+
 Railway inyecta `PORT`; `npm start` ya usa `react-router-serve` y respeta el puerto.
 
 ### Build / Start

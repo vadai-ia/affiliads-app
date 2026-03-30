@@ -98,13 +98,13 @@ export async function action({ request, params }: Route.ActionArgs) {
     .from("campaign_activations")
     .select("id")
     .eq("template_id", id)
-    .in("status", ["active", "activating"])
+    .in("status", ["active", "activating", "queued"])
     .limit(1);
 
   if ((blocking?.length ?? 0) > 0) {
     return data(
       actionError(
-        "No puedes editar un template con activaciones active o activating.",
+        "No puedes editar un template con activaciones en cola, activando o activas.",
       ),
       { headers, status: 409 },
     );

@@ -12,7 +12,6 @@ import {
   CardTitle,
 } from "~/components/ui/card";
 import { Label } from "~/components/ui/label";
-import { dispatchCampaignCreateJob } from "~/lib/campaign-create.server";
 import { requireLeader } from "~/lib/auth.server";
 import { actionError, formatZodFieldErrors } from "~/lib/errors";
 import { activationStatusBadgeVariant } from "~/lib/activations";
@@ -25,6 +24,7 @@ import type { Route } from "./+types/_leader.activations.$id";
 
 const actionSchema = z.discriminatedUnion("intent", [
   z.object({ intent: z.literal("approve") }),
+  z.object({ intent: z.literal("retry_dispatch") }),
   z.object({
     intent: z.literal("reject"),
     reason: z.string().min(5, "La razón debe tener al menos 5 caracteres"),
@@ -61,29 +61,41 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     throw new Response("No encontrado", { status: 404, headers });
   }
 
-  const [{ data: affiliate }, { data: template }, { data: geo }, { data: payment }] =
-    await Promise.all([
-      supabase
-        .from("users")
-        .select("id, full_name, email, subdomain")
-        .eq("id", activation.affiliate_id)
-        .single(),
-      supabase
-        .from("campaign_templates")
-        .select("name, copy_base, min_budget, max_budget")
-        .eq("id", activation.template_id)
-        .single(),
-      supabase
-        .from("allowed_geos")
-        .select("label, country_code")
-        .eq("id", activation.selected_geo_id)
-        .single(),
-      supabase
-        .from("payments")
-        .select("*")
-        .eq("activation_id", activation.id)
-        .maybeSingle(),
-    ]);
+  const [
+    { data: affiliate },
+    { data: template },
+    { data: geo },
+    { data: payment },
+    { data: createJob },
+  ] = await Promise.all([
+    supabase
+      .from("users")
+      .select("id, full_name, email, subdomain")
+      .eq("id", activation.affiliate_id)
+      .single(),
+    supabase
+      .from("campaign_templates")
+      .select("name, copy_base, min_budget, max_budget")
+      .eq("id", activation.template_id)
+      .single(),
+    supabase
+      .from("allowed_geos")
+      .select("label, country_code")
+      .eq("id", activation.selected_geo_id)
+      .single(),
+    supabase
+      .from("payments")
+      .select("*")
+      .eq("activation_id", activation.id)
+      .maybeSingle(),
+    supabase
+      .from("campaign_create_jobs")
+      .select(
+        "status, attempt_count, dispatch_count, last_dispatched_at, last_error, current_step",
+      )
+      .eq("activation_id", activation.id)
+      .maybeSingle(),
+  ]);
 
   return data(
     {
@@ -94,6 +106,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       geoLabel: geo?.label ?? "—",
       geoCountry: geo?.country_code ?? "",
       payment: payment ?? null,
+      createJob: createJob ?? null,
     },
     { headers },
   );
@@ -112,6 +125,9 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   try {
     const parsed = actionSchema.parse(raw);
+    const { dispatchCampaignCreateJob, insertPendingJob } = await import(
+      "~/lib/campaign-create.server"
+    );
 
     const { data: activation, error: loadErr } = await admin
       .from("campaign_activations")
@@ -136,7 +152,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 
       const { data: updatedAct, error: u1 } = await admin
         .from("campaign_activations")
-        .update({ status: "activating", updated_at: now })
+        .update({ status: "queued", updated_at: now })
         .eq("id", id)
         .eq("org_id", user.orgId)
         .eq("status", "pending_approval")
@@ -177,7 +193,46 @@ export async function action({ request, params }: Route.ActionArgs) {
         );
       }
 
+      try {
+        await insertPendingJob(admin, user.orgId, id);
+      } catch (jobErr) {
+        await admin
+          .from("campaign_activations")
+          .update({ status: "pending_approval", updated_at: now })
+          .eq("id", id)
+          .eq("org_id", user.orgId);
+        await admin
+          .from("payments")
+          .update({
+            status: "pending",
+            reviewed_at: null,
+            reviewed_by: null,
+            updated_at: now,
+          })
+          .eq("activation_id", id);
+        return data(
+          actionError(
+            jobErr instanceof Error
+              ? jobErr.message
+              : "No se pudo crear el job de publicación.",
+          ),
+          { headers, status: 500 },
+        );
+      }
+
       const dispatch = await dispatchCampaignCreateJob(id);
+
+      await admin.from("activity_log").insert({
+        org_id: user.orgId,
+        user_id: user.id,
+        entity_type: "campaign_activation",
+        entity_id: id,
+        action: "activation.job_queued",
+        metadata: {
+          inngest_sent: dispatch.sent,
+          inngest_error: dispatch.error ?? null,
+        },
+      });
 
       await admin.from("activity_log").insert({
         org_id: user.orgId,
@@ -209,6 +264,59 @@ export async function action({ request, params }: Route.ActionArgs) {
           dispatch.error,
         );
       }
+
+      throw redirect("/leader/activations");
+    }
+
+    if (parsed.intent === "retry_dispatch") {
+      if (activation.status !== "queued" && activation.status !== "activating") {
+        return data(
+          actionError(
+            "Solo se puede reintentar si está en cola o activándose en Meta.",
+          ),
+          { headers, status: 409 },
+        );
+      }
+
+      const { data: pay } = await admin
+        .from("payments")
+        .select("status")
+        .eq("activation_id", id)
+        .maybeSingle();
+      if (pay?.status !== "approved") {
+        return data(actionError("El pago no está aprobado."), {
+          headers,
+          status: 400,
+        });
+      }
+
+      const { data: jobRow } = await admin
+        .from("campaign_create_jobs")
+        .select("id, status")
+        .eq("activation_id", id)
+        .maybeSingle();
+
+      if (!jobRow) {
+        await insertPendingJob(admin, user.orgId, id);
+      } else if (jobRow.status === "failed") {
+        await admin
+          .from("campaign_create_jobs")
+          .update({ status: "pending", last_error: null })
+          .eq("id", jobRow.id);
+      }
+
+      const dispatch = await dispatchCampaignCreateJob(id);
+      await admin.from("activity_log").insert({
+        org_id: user.orgId,
+        user_id: user.id,
+        entity_type: "campaign_activation",
+        entity_id: id,
+        action: "activation.job_requeued",
+        metadata: {
+          inngest_sent: dispatch.sent,
+          inngest_error: dispatch.error ?? null,
+        },
+      });
 
       throw redirect("/leader/activations");
     }
@@ -328,11 +436,15 @@ export default function LeaderActivationDetail({
     geoLabel,
     geoCountry,
     payment,
+    createJob,
   } = loaderData;
 
   const navigation = useNavigation();
   const submitting = navigation.state === "submitting";
   const canReview = activation.status === "pending_approval";
+  const canRetryDispatch =
+    (activation.status === "queued" || activation.status === "activating") &&
+    payment?.status === "approved";
 
   const approveDialogRef = useRef<HTMLDialogElement>(null);
   const [rejectReason, setRejectReason] = useState("");
@@ -454,6 +566,59 @@ export default function LeaderActivationDetail({
         </CardContent>
       </Card>
 
+      {createJob ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Job publicación Meta</CardTitle>
+            <CardDescription>
+              Cola durable + Inngest. Si el envío falló, reintenta abajo.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-1 text-sm">
+            <p>
+              <span className="text-muted-foreground">Estado job: </span>
+              {createJob.status}
+            </p>
+            <p>
+              <span className="text-muted-foreground">Intentos worker: </span>
+              {createJob.attempt_count} · Despachos: {createJob.dispatch_count}
+            </p>
+            {createJob.current_step ? (
+              <p>
+                <span className="text-muted-foreground">Paso: </span>
+                {createJob.current_step}
+              </p>
+            ) : null}
+            {createJob.last_dispatched_at ? (
+              <p className="text-muted-foreground text-xs">
+                Último dispatch:{" "}
+                {new Date(createJob.last_dispatched_at).toLocaleString("es-MX")}
+              </p>
+            ) : null}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {canRetryDispatch ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Reintentar envío a Meta</CardTitle>
+            <CardDescription>
+              Vuelve a encolar el evento <code>campaign/create</code> (Inngest)
+              sin cambiar el pago.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Form method="post" className="flex flex-wrap gap-3">
+              <input type="hidden" name="intent" value="retry_dispatch" />
+              <Button type="submit" variant="secondary" disabled={submitting}>
+                {submitting ? "Enviando…" : "Reintentar publicación"}
+              </Button>
+            </Form>
+          </CardContent>
+        </Card>
+      ) : null}
+
       {canReview ? (
         <Card>
           <CardHeader>
@@ -486,8 +651,8 @@ export default function LeaderActivationDetail({
             >
               <p className="text-sm">
                 ¿Confirmas que el comprobante y el monto son correctos? Se
-                marcará la solicitud como <strong>activating</strong> y se
-                enviará el job a Inngest.
+                marcará la solicitud como <strong>queued</strong> (cola interna)
+                y se enviará el evento a Inngest para crear la campaña en Meta.
               </p>
               <div className="mt-4 flex justify-end gap-2">
                 <Button

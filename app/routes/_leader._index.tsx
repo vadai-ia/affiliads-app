@@ -55,7 +55,8 @@ export async function loader({ request }: Route.LoaderArgs) {
   }
 
   const pendingApproval = counts.pending_approval ?? 0;
-  const activating = counts.activating ?? 0;
+  const activating =
+    (counts.activating ?? 0) + (counts.queued ?? 0);
   const active = counts.active ?? 0;
 
   const { data: pendingList } = await supabase

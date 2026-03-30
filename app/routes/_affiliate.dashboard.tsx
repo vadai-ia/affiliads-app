@@ -72,8 +72,9 @@ export default function AffiliateDashboard({ loaderData }: Route.ComponentProps)
   const summary = [
     { key: "pending_approval", label: "Pendientes de aprobación" },
     { key: "pending_payment", label: "Pendientes de pago" },
+    { key: "queued", label: "En cola (Meta)" },
     { key: "active", label: "Activas" },
-    { key: "activating", label: "Activando" },
+    { key: "activating", label: "Activando en Meta" },
     { key: "rejected", label: "Rechazadas" },
     { key: "completed", label: "Completadas" },
   ] as const;

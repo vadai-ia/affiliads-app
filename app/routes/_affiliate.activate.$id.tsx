@@ -194,6 +194,7 @@ export async function action({ request, params }: Route.ActionArgs) {
       .in("status", [
         "pending_payment",
         "pending_approval",
+        "queued",
         "activating",
         "active",
       ])

@@ -3,6 +3,7 @@ import { z } from "zod";
 export const activationStatuses = [
   "pending_payment",
   "pending_approval",
+  "queued",
   "rejected",
   "activating",
   "active",
@@ -75,6 +76,8 @@ export function activationStatusBadgeVariant(
       return "default";
     case "pending_approval":
     case "pending_payment":
+      return "secondary";
+    case "queued":
       return "secondary";
     case "rejected":
     case "failed":

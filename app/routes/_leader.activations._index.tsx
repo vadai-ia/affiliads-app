@@ -26,6 +26,7 @@ type ActivationStatus = Database["public"]["Tables"]["campaign_activations"]["Ro
 const STATUS_OPTIONS: Array<ActivationStatus | "all"> = [
   "all",
   "pending_approval",
+  "queued",
   "activating",
   "active",
   "rejected",

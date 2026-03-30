@@ -232,6 +232,7 @@ export interface Database {
           status:
             | "pending_payment"
             | "pending_approval"
+            | "queued"
             | "rejected"
             | "activating"
             | "active"
@@ -259,6 +260,7 @@ export interface Database {
           status?:
             | "pending_payment"
             | "pending_approval"
+            | "queued"
             | "rejected"
             | "activating"
             | "active"
@@ -274,6 +276,42 @@ export interface Database {
         };
         Update: Partial<
           Database["public"]["Tables"]["campaign_activations"]["Insert"]
+        >;
+        Relationships: [];
+      };
+      campaign_create_jobs: {
+        Row: {
+          id: string;
+          org_id: string;
+          activation_id: string;
+          status: "pending" | "dispatched" | "running" | "succeeded" | "failed";
+          attempt_count: number;
+          dispatch_count: number;
+          last_error: Json | null;
+          last_dispatched_at: string | null;
+          locked_at: string | null;
+          locked_by: string | null;
+          current_step: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          activation_id: string;
+          status?: "pending" | "dispatched" | "running" | "succeeded" | "failed";
+          attempt_count?: number;
+          dispatch_count?: number;
+          last_error?: Json | null;
+          last_dispatched_at?: string | null;
+          locked_at?: string | null;
+          locked_by?: string | null;
+          current_step?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<
+          Database["public"]["Tables"]["campaign_create_jobs"]["Insert"]
         >;
         Relationships: [];
       };
