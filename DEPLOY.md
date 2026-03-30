@@ -61,7 +61,7 @@ Configura **todas** estas variables en el servicio (mismo nombre que en `.env.ex
 | `META_APP_SECRET` | Opcional; **solo** Railway/servidor, nunca en build cliente |
 | `INNGEST_EVENT_KEY` | Para enviar eventos (`campaign/create`) al aprobar pagos |
 | `INNGEST_SIGNING_KEY` | Para que Inngest Cloud invoque de forma segura `GET/POST /api/inngest` |
-| `INNGEST_ENV` | **Recomendada en Railway producción.** El SDK infiere `RAILWAY_GIT_BRANCH` (p. ej. `main`) y envía a un [branch env](https://www.inngest.com/docs/platform/environments#configuring-branch-environments), no al entorno Production del dashboard. Debe coincidir con el selector de entorno en app.inngest.com (suele ser `production` o el slug que uses). Si no coincide con donde están sincronizadas las funciones: evento recibido pero **“No functions triggered”**. |
+| `INNGEST_ENV` | **Vacío en producción Railway** salvo branch previews en Inngest. Si está definido, debe coincidir con el entorno donde están las funciones. `strip-railway-branch.mjs` (primer `--import` en `npm start`) borra `RAILWAY_GIT_BRANCH` para que el SDK no envíe `x-inngest-env: main`. |
 
 En el dashboard de Inngest, la URL de sync debe ser la misma base que `SITE_URL` (Railway), p. ej. `https://affiliads-app-production.up.railway.app/api/inngest` (cambia el host si tu servicio tiene otro dominio).
 

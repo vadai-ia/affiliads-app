@@ -1,26 +1,20 @@
 import { Inngest } from "inngest";
 
 /**
- * Entorno Inngest (header `x-inngest-env`). Debe coincidir con el selector del
- * dashboard (mismo valor con el que se sincronizan las funciones vía `/api/inngest`).
+ * Entorno Inngest (`env` / `INNGEST_ENV` → header `x-inngest-env`).
+ * Solo hace falta para [Branch Environments](https://www.inngest.com/docs/platform/environments#branch-environments).
  *
- * - `INNGEST_ENV` en Railway si quieres un valor explícito (recomendado en prod).
- * - Sin `INNGEST_ENV`, el SDK infiere `RAILWAY_GIT_BRANCH` (p. ej. `main`) en Railway
- *   → entorno **branch**, no Production → eventos recibidos pero "No functions triggered"
- *   si las funciones están en Production.
- * - En servicio Railway `production` forzamos `production` para alinear con el
- *   entorno Production por defecto de Inngest Cloud (sobrescribe con `INNGEST_ENV`).
+ * En Railway producción, `strip-railway-branch.mjs` (primer `--import` en `npm start`)
+ * quita `RAILWAY_GIT_BRANCH`; si no, el SDK infiere branch (`main`) y desalinea eventos
+ * vs funciones en el selector "Production" del dashboard.
  *
- * @see https://www.inngest.com/docs/platform/environments#configuring-branch-environments
- * @see https://www.inngest.com/docs/sdk/environment-variables#inngest-env
+ * Si necesitas preview por rama, define `INNGEST_ENV` explícito (y no borres la rama en instrument).
+ *
+ * @see https://www.inngest.com/docs/reference/client/create
  */
 function resolveInngestEnv(): string | undefined {
   const v = process.env.INNGEST_ENV?.trim();
-  if (v) return v;
-  if (process.env.RAILWAY_ENVIRONMENT === "production") {
-    return "production";
-  }
-  return undefined;
+  return v || undefined;
 }
 
 /** Cliente único de Inngest para eventos y registro de funciones. */

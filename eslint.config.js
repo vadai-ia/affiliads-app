@@ -9,6 +9,7 @@ export default tseslint.config(
       "node_modules/**",
       ".react-router/**",
       "instrument.server.mjs",
+      "strip-railway-branch.mjs",
     ],
   },
   js.configs.recommended,

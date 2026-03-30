@@ -1,5 +1,5 @@
 /**
- * Carga antes que el servidor (NODE_OPTIONS=--import ./instrument.server.mjs).
+ * Carga antes que el servidor (NODE_OPTIONS incluye strip-railway-branch.mjs antes que este archivo).
  * Inicializa Sentry en Node para que captureException / transacciones funcionen.
  */
 import { init } from "@sentry/react-router";
