@@ -76,10 +76,10 @@ export const campaignCreate = inngest.createFunction(
         await traceMetaStep(activationId, "meta-adset", runId);
         return ensureMetaAdsetStep(activationId);
       });
-      await step.run("meta-ad", async () => {
-        await traceMetaStep(activationId, "meta-ad", runId);
-        return ensureMetaAdStep(activationId);
-      });
+      await step.run("meta-ad-trace", () =>
+        traceMetaStep(activationId, "meta-ad", runId),
+      );
+      await ensureMetaAdStep(activationId, step);
       await step.run("meta-activate", async () => {
         await traceMetaStep(activationId, "meta-activate", runId);
         return finalizeActivationStep(activationId);

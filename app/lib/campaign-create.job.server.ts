@@ -3,17 +3,18 @@ import type { Database } from "~/types/database";
 import { decryptMetaAccessToken } from "~/lib/crypto.server";
 import {
   createAdPaused,
+  createAdVideoFromUrl,
   createCampaignPaused,
   createAdSetPaused,
   createLinkAdCreative,
   createVideoAdCreative,
+  getMetaVideoStatus,
   type MetaCampaignObjective,
   normalizeAdAccountId,
   updateAdSetStatus,
   updateAdStatus,
   updateCampaignStatus,
   uploadAdImageFromUrl,
-  uploadAdVideoFromUrl,
 } from "~/lib/meta/campaigns.server";
 import { isMetaApiError } from "~/lib/meta/client";
 import {
@@ -27,7 +28,9 @@ import {
   markJobSucceeded,
   updateJobStep,
 } from "~/lib/campaign-create-queue.server";
+import type { GetStepTools } from "inngest";
 import { NonRetriableError } from "inngest";
+import { inngest } from "~/lib/inngest/client";
 
 type ActivationRow = Database["public"]["Tables"]["campaign_activations"]["Row"];
 type TemplateRow = Database["public"]["Tables"]["campaign_templates"]["Row"];
@@ -338,14 +341,22 @@ export async function ensureMetaAdsetStep(activationId: string): Promise<string>
   return adset.adsetId;
 }
 
+/** ~15 min de espera entre checks (encoding largo en Meta) sin bloquear un HTTP único. */
+const META_VIDEO_ENCODE_MAX_ROUNDS = 90;
+const META_VIDEO_ENCODE_SLEEP = "10s" as const;
+
 /** Sube asset, creativo y anuncio; persiste meta_ad_id. Idempotente si ya hay anuncio. */
-export async function ensureMetaAdStep(activationId: string): Promise<string> {
+export async function ensureMetaAdStep(
+  activationId: string,
+  step: GetStepTools<typeof inngest>,
+): Promise<string> {
   const ctx = await loadCampaignCreateContext(activationId);
   const { activation, template, assets, meta, accessToken } = ctx;
   if (activation.meta_ad_id) {
     return activation.meta_ad_id;
   }
-  if (!activation.meta_adset_id) {
+  const adsetId = activation.meta_adset_id;
+  if (!adsetId) {
     throw new NonRetriableError(
       "Falta meta_adset_id; ejecuta primero el paso de conjunto.",
     );
@@ -357,58 +368,89 @@ export async function ensureMetaAdStep(activationId: string): Promise<string> {
   let creativeId: string;
 
   if (asset.file_type === "video") {
-    const vid = await uploadAdVideoFromUrl(
-      accessToken,
-      adAccountId,
-      asset.file_url,
-    );
-    const cr = await createVideoAdCreative(accessToken, adAccountId, {
-      name: `${baseName} (creativo)`,
-      pageId: meta.page_id,
-      instagramActorId: meta.ig_account_id,
-      link: activation.landing_url,
-      message: template.copy_base,
-      videoId: vid.videoId,
+    const videoId = await step.run("meta-ad-video-upload", async () => {
+      const v = await createAdVideoFromUrl(
+        accessToken,
+        adAccountId,
+        asset.file_url,
+      );
+      return v.videoId;
     });
-    creativeId = cr.creativeId;
+
+    let videoCreativeId: string | undefined;
+    for (let i = 0; i < META_VIDEO_ENCODE_MAX_ROUNDS; i++) {
+      const status = await step.run(`meta-ad-video-status-${i}`, async () =>
+        getMetaVideoStatus(accessToken, videoId),
+      );
+      if (status === "ready" || status === "published") {
+        videoCreativeId = await step.run("meta-ad-video-creative", async () => {
+          const cr = await createVideoAdCreative(accessToken, adAccountId, {
+            name: `${baseName} (creativo)`,
+            pageId: meta.page_id,
+            instagramActorId: meta.ig_account_id,
+            link: activation.landing_url,
+            message: template.copy_base,
+            videoId,
+          });
+          return cr.creativeId;
+        });
+        break;
+      }
+      if (status === "error" || status === "failed") {
+        throw new NonRetriableError(
+          `El vídeo falló el procesamiento en Meta (status=${status}).`,
+        );
+      }
+      await step.sleep(`meta-ad-video-wait-${i}`, META_VIDEO_ENCODE_SLEEP);
+    }
+    if (!videoCreativeId) {
+      throw new NonRetriableError(
+        `Timeout tras ~${(META_VIDEO_ENCODE_MAX_ROUNDS * 10) / 60} min esperando encoding del vídeo en Meta. Prueba un vídeo más corto o reintenta.`,
+      );
+    }
+    creativeId = videoCreativeId;
   } else {
-    const img = await uploadAdImageFromUrl(
-      accessToken,
-      adAccountId,
-      asset.file_url,
-    );
-    const cr = await createLinkAdCreative(accessToken, adAccountId, {
-      name: `${baseName} (creativo)`,
-      pageId: meta.page_id,
-      instagramActorId: meta.ig_account_id,
-      link: activation.landing_url,
-      message: template.copy_base,
-      imageHash: img.hash,
+    creativeId = await step.run("meta-ad-image-creative", async () => {
+      const img = await uploadAdImageFromUrl(
+        accessToken,
+        adAccountId,
+        asset.file_url,
+      );
+      const cr = await createLinkAdCreative(accessToken, adAccountId, {
+        name: `${baseName} (creativo)`,
+        pageId: meta.page_id,
+        instagramActorId: meta.ig_account_id,
+        link: activation.landing_url,
+        message: template.copy_base,
+        imageHash: img.hash,
+      });
+      return cr.creativeId;
     });
-    creativeId = cr.creativeId;
   }
 
-  const ad = await createAdPaused(accessToken, adAccountId, {
-    name: `${baseName} (anuncio)`,
-    adsetId: activation.meta_adset_id,
-    creativeId,
+  return await step.run("meta-ad-publish", async () => {
+    const ad = await createAdPaused(accessToken, adAccountId, {
+      name: `${baseName} (anuncio)`,
+      adsetId,
+      creativeId,
+    });
+
+    const admin = getSupabaseAdmin();
+    const now = new Date().toISOString();
+    const { error } = await admin
+      .from("campaign_activations")
+      .update({
+        meta_ad_id: ad.adId,
+        updated_at: now,
+      })
+      .eq("id", activationId)
+      .eq("org_id", activation.org_id)
+      .eq("status", "activating");
+    if (error) {
+      throw new NonRetriableError(error.message);
+    }
+    return ad.adId;
   });
-
-  const admin = getSupabaseAdmin();
-  const now = new Date().toISOString();
-  const { error } = await admin
-    .from("campaign_activations")
-    .update({
-      meta_ad_id: ad.adId,
-      updated_at: now,
-    })
-    .eq("id", activationId)
-    .eq("org_id", activation.org_id)
-    .eq("status", "activating");
-  if (error) {
-    throw new NonRetriableError(error.message);
-  }
-  return ad.adId;
 }
 
 /** Activa la campaña en Meta y marca la activación como `active`. */

@@ -102,13 +102,11 @@ export async function uploadAdImageFromUrl(
   return { hash };
 }
 
-const VIDEO_POLL_MAX = 36;
-const VIDEO_POLL_MS = 5000;
-
 /**
- * Sube vídeo y espera a que el encoding esté listo.
+ * Crea el vídeo en la cuenta de anuncios (encoding asíncrono en Meta).
+ * El polling hasta `ready` lo hace `ensureMetaAdStep` con `step.sleep` (no bloquear HTTP).
  */
-export async function uploadAdVideoFromUrl(
+export async function createAdVideoFromUrl(
   accessToken: string,
   adAccountId: string,
   videoUrl: string,
@@ -123,24 +121,11 @@ export async function uploadAdVideoFromUrl(
   if (!videoId) {
     throw new NonRetriableError("Meta no devolvió video id al subir el vídeo.");
   }
-  for (let i = 0; i < VIDEO_POLL_MAX; i++) {
-    const status = await graphGetVideoStatus(accessToken, videoId);
-    if (status === "ready" || status === "published") {
-      return { videoId };
-    }
-    if (status === "error" || status === "failed") {
-      throw new NonRetriableError(
-        `El vídeo falló el procesamiento en Meta (status=${status}).`,
-      );
-    }
-    await new Promise((r) => setTimeout(r, VIDEO_POLL_MS));
-  }
-  throw new NonRetriableError(
-    "Timeout esperando que Meta procesara el vídeo (encoding).",
-  );
+  return { videoId };
 }
 
-async function graphGetVideoStatus(
+/** Estado de procesamiento del vídeo en Meta (`processing`, `ready`, etc.). */
+export async function getMetaVideoStatus(
   accessToken: string,
   videoId: string,
 ): Promise<string> {
