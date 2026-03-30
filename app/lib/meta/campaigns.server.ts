@@ -357,3 +357,19 @@ export async function updateCampaignStatus(
 ): Promise<void> {
   await graphPostForm(`/${campaignId}`, accessToken, { status });
 }
+
+export async function updateAdSetStatus(
+  accessToken: string,
+  adSetId: string,
+  status: "ACTIVE" | "PAUSED",
+): Promise<void> {
+  await graphPostForm(`/${adSetId}`, accessToken, { status });
+}
+
+export async function updateAdStatus(
+  accessToken: string,
+  adId: string,
+  status: "ACTIVE" | "PAUSED",
+): Promise<void> {
+  await graphPostForm(`/${adId}`, accessToken, { status });
+}

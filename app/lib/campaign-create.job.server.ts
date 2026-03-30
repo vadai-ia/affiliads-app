@@ -9,6 +9,8 @@ import {
   createVideoAdCreative,
   type MetaCampaignObjective,
   normalizeAdAccountId,
+  updateAdSetStatus,
+  updateAdStatus,
   updateCampaignStatus,
   uploadAdImageFromUrl,
   uploadAdVideoFromUrl,
@@ -416,12 +418,19 @@ export async function finalizeActivationStep(activationId: string): Promise<void
   if (activation.status === "active") {
     return;
   }
-  if (!activation.meta_campaign_id || !activation.meta_ad_id) {
+  if (
+    !activation.meta_campaign_id ||
+    !activation.meta_adset_id ||
+    !activation.meta_ad_id
+  ) {
     throw new NonRetriableError(
       "Faltan IDs de Meta necesarios para activar la campaña.",
     );
   }
+  // Solo activar la campaña deja el conjunto y el anuncio en PAUSED → no hay entrega.
   await updateCampaignStatus(accessToken, activation.meta_campaign_id, "ACTIVE");
+  await updateAdSetStatus(accessToken, activation.meta_adset_id, "ACTIVE");
+  await updateAdStatus(accessToken, activation.meta_ad_id, "ACTIVE");
 
   const admin = getSupabaseAdmin();
   const now = new Date().toISOString();
